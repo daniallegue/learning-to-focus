@@ -42,6 +42,10 @@ class AdaptiveSpanAttention(Attention):
         self.head_dim = config.embed_dim // config.num_heads
         self.max_len = config.max_tokens
 
+        # Number of bottom layers use as strict local attention
+        self.hybrid_local_layers: int = 4
+        self.aha : bool = True
+
         # projectors
         self.key = nn.Linear(config.embed_dim, config.embed_dim)
         self.query = nn.Linear(config.embed_dim, config.embed_dim)

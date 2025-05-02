@@ -50,6 +50,10 @@ class TransformerConfig:
     init_adaptive_span: float = 64.0
     max_adaptive_span: Optional[int] = None
     adaptive_span_regularization: float = 0.0 # regularization weight for adaptive span
+    aha : bool = True
+    gru_gating : bool = True
+    hybrid_local_layers: int = 4
+
 
     @property
     def max_tokens(self):

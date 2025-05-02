@@ -12,7 +12,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
     batch_size = 64
     num_unroll_steps = 10
     infer_context_length = 4
-    num_layers = 2
+    num_layers = 2 # Might change it to 4
     replay_ratio = 0.25
 
     atari_unizero_config = dict(
@@ -34,7 +34,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                 observation_shape=(3, 64, 64),
                 action_space_size=action_space_size,
                 world_model_cfg=dict(
-                    attention='routing',  # ← Use routing attention
+                    attention='causal',  # ← Fallback when aha = True
                     policy_entropy_weight=1e-4,
                     continuous_action_space=False,
                     max_blocks=num_unroll_steps,
@@ -49,16 +49,23 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     env_num=max(collector_env_num, evaluator_env_num),
                     rotary_emb=False,
 
+                    # === Hybrid Attention Parameters ===
+                    aha = True,
+                    hybrid_local_layers=1,
+                    init_adaptive_span=64.0,
+                    max_adaptive_span=128,
+                    adaptive_span_regularization=1e-3,
+
                     # === Routing Transformer Parameters ===
-                    routing_num_clusters=4,  # sqrt(20) ≈ 4–5
-                    routing_update_interval=1,
-                    routing_topk=32,
-                    routing_decay=0.999,
-                    routing_commitment=1e-4,
-                    routing_num_mem_kv=0,
-                    use_local_attention=False,
-                    local_window_size=None,
-                    routing_context_window_size=4,  # optional: match routing window
+                    # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
+                    # routing_update_interval=1,
+                    # routing_topk=32,
+                    # routing_decay=0.999,
+                    # routing_commitment=1e-4,
+                    # routing_num_mem_kv=0,
+                    # use_local_attention=False,
+                    # local_window_size=None,
+                    # routing_context_window_size=4,  # optional: match routing window
                 ),
             ),
             model_path=None,
