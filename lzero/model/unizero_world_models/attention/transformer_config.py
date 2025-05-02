@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class TransformerConfig:
     tokens_per_block: int
     max_blocks: int
-    attention: str  # 'global', 'causal', 'routing'
+    attention: str  # 'causal', 'local', 'local+routing', 'routing', 'adaptive'
 
     num_layers: int
     num_heads: int
@@ -45,6 +45,11 @@ class TransformerConfig:
     routing_commitment: float = 1e-4
     # context window size when receives_context=True
     routing_context_window_size: Optional[int] = None
+
+    # Adaptive Hybrid Params
+    init_adaptive_span: float = 64.0
+    max_adaptive_span: Optional[int] = None
+    adaptive_span_regularization: float = 0.0 # regularization weight for adaptive span
 
     @property
     def max_tokens(self):
