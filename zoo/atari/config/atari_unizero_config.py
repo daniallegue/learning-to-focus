@@ -1,7 +1,7 @@
 from easydict import EasyDict
 from zoo.atari.config.atari_env_action_space_map import atari_env_action_space_map
 
-def main(env_id='BoxingNoFrameskip-v4', seed=0):
+def main(env_id='FreewayNoFrameskip-v4', seed=0):
     action_space_size = atari_env_action_space_map[env_id]
 
     collector_env_num = 8

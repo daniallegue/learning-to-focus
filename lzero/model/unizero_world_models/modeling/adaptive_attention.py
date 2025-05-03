@@ -43,7 +43,7 @@ class AdaptiveSpanAttention(Attention):
         self.max_len = config.max_tokens
 
         # Number of bottom layers use as strict local attention
-        self.hybrid_local_layers: int = 4
+        self.hybrid_local_layers: int = 1
         self.aha : bool = True
 
         # projectors
@@ -80,7 +80,7 @@ class AdaptiveSpanAttention(Attention):
         """
 
         B, T, C = x.size()
-        device = x.device()
+        device = x.device
 
         q = self.query(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)  # (B, nh, T, d)
         k = self.key(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
