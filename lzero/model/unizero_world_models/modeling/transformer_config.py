@@ -38,21 +38,21 @@ class TransformerConfig:
     routing_topk: Optional[int] = None
 
     # how many extra memory KV slots per cluster
-    routing_num_mem_kv: int = 0
+    routing_num_mem_kv: Optional[int] = 0
     # decay for centroid updates
-    routing_decay: float = 0.999
+    routing_decay: Optional[float] = 0.999
     # commitment loss weight for KMeans
-    routing_commitment: float = 1e-4
+    routing_commitment: Optional[float] = 1e-4
     # context window size when receives_context=True
     routing_context_window_size: Optional[int] = None
 
     # Adaptive Hybrid Params
-    init_adaptive_span: float = 64.0
+    init_adaptive_span: Optional[float] = 64.0
     max_adaptive_span: Optional[int] = None
-    adaptive_span_regularization: float = 0.0 # regularization weight for adaptive span
-    aha : bool = True
-    gru_gating : bool = True
-    hybrid_local_layers: int = 4
+    adaptive_span_regularization: Optional[float] = 0.0 # regularization weight for adaptive span
+    aha : Optional[bool] = True
+    gru_gating : Optional[bool] = True
+    hybrid_local_layers: Optional[int] = 4
 
 
     @property
