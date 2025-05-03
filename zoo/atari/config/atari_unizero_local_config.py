@@ -48,17 +48,20 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     obs_type='image',
                     env_num=max(collector_env_num, evaluator_env_num),
                     rotary_emb=False,
+                    # Set Hybrid to False
+                    aha = False,
+                    # Set window size
+                    local_window_size=32,
 
                     # === Routing Transformer Parameters ===
-                    routing_num_clusters=4,  # sqrt(20) ≈ 4–5
-                    routing_update_interval=1,
-                    routing_topk=32,
-                    routing_decay=0.999,
-                    routing_commitment=1e-4,
-                    routing_num_mem_kv=0,
-                    use_local_attention=False,
-                    local_window_size=32,
-                    routing_context_window_size=4,  # optional: match routing window
+                    # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
+                    # routing_update_interval=1,
+                    # routing_topk=32,
+                    # routing_decay=0.999,
+                    # routing_commitment=1e-4,
+                    # routing_num_mem_kv=0,
+                    # use_local_attention=False,
+                    # routing_context_window_size=4,  # optional: match routing window
                 ),
             ),
             model_path=None,

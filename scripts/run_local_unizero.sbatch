@@ -3,14 +3,14 @@
 #SBATCH --partition=gpu-a100,gpu-v100
 
 # The default run4
-#SBATCH --time=5:30:00
+#SBATCH --time=5:00:00
 
 # The default number of parallel tasks per job is 1
 #SBATCH --ntasks=1
 
 # Request 1 CPU per active thread of your program (assume 1 unless you specifically set this)
 # The default-per-cpu=1024
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=10
 
 #SBATCH --gpus-per-task=1
 

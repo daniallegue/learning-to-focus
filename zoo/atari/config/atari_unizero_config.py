@@ -34,7 +34,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                 observation_shape=(3, 64, 64),
                 action_space_size=action_space_size,
                 world_model_cfg=dict(
-                    attention='causal',  # ← Fallback when aha = True
+                    attention='causal',  # ← Fallback when aha = False
                     policy_entropy_weight=1e-4,
                     continuous_action_space=False,
                     max_blocks=num_unroll_steps,
@@ -55,6 +55,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     init_adaptive_span=64.0,
                     max_adaptive_span=128,
                     adaptive_span_regularization=1e-3,
+                    local_window_size = 32, # must be set
 
                     # === Routing Transformer Parameters ===
                     # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
