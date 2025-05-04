@@ -1,7 +1,7 @@
 from easydict import EasyDict
 from zoo.atari.config.atari_env_action_space_map import atari_env_action_space_map
 
-def main(env_id='FreewayNoFrameskip-v4', seed=0):
+def main(env_id='BoxingNoFrameskip-v4', seed=0):
     action_space_size = atari_env_action_space_map[env_id]
 
     collector_env_num = 8
@@ -12,7 +12,7 @@ def main(env_id='FreewayNoFrameskip-v4', seed=0):
     batch_size = 64
     num_unroll_steps = 10
     infer_context_length = 4
-    num_layers = 2
+    num_layers = 12
     replay_ratio = 0.25
 
     atari_unizero_config = dict(
@@ -51,7 +51,7 @@ def main(env_id='FreewayNoFrameskip-v4', seed=0):
                     # Set Hybrid to False
                     aha = False,
                     # Set window size
-                    local_window_size=32,
+                    local_window_size=64,
 
                     # === Routing Transformer Parameters ===
                     # routing_num_clusters=4,  # sqrt(20) ≈ 4–5

@@ -33,5 +33,5 @@ srun apptainer exec --nv \
     --bind "${PROJECT_DIR}:/workspace" \
     "${SIF_FILE}" \
     python -m zoo.atari.config.atari_unizero_config \
-      --env FreewayNoFrameskip-v4 \
+      --env BoxingNoFrameskip-v4 \
       --seed 0
