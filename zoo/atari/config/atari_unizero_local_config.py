@@ -11,7 +11,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
     max_env_step = int(1e5)
     batch_size = 64
     num_unroll_steps = 10
-    infer_context_length = 8
+    infer_context_length = 4
     num_layers = 4
     replay_ratio = 0.25
 

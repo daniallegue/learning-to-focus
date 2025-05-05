@@ -10,7 +10,7 @@
 
 # Request 1 CPU per active thread of your program (assume 1 unless you specifically set this)
 # The default-per-cpu=1024
-#SBATCH --cpus-per-task=6
+#SBATCH --cpus-per-task=10
 
 #SBATCH --gpus-per-task=1
 
@@ -33,5 +33,5 @@ srun apptainer exec --nv \
     --bind "${PROJECT_DIR}:/workspace" \
     "${SIF_FILE}" \
     python -m zoo.atari.config.atari_unizero_vanilla_config\
-      --env FreewayNoFrameskip-v4 \
+      --env BoxingNoFrameskip-v4 \
       --seed 0
