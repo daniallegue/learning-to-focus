@@ -5,14 +5,14 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
     action_space_size = atari_env_action_space_map[env_id]
 
     collector_env_num = 8
-    game_segment_length = 20
-    evaluator_env_num = 3
+    game_segment_length = 400
+    evaluator_env_num = 4
     num_simulations = 50
     max_env_step = int(1e5)
     batch_size = 64
     num_unroll_steps = 10
-    infer_context_length = 6
-    num_layers = 8 # Might change it to 4
+    infer_context_length = 4
+    num_layers = 4 # Might change it to 4
     replay_ratio = 0.25
 
     atari_unizero_config = dict(
@@ -55,8 +55,8 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     # init_adaptive_span=64.0,
                     # max_adaptive_span=128,
                     # adaptive_span_regularization=1e-3,
-                    local_window_size = 128, # must be set
-                    interleave_local_causal = True,
+                    local_window_size = 32, # must be set
+                    interleave_local_causal = False,
 
                     # === Routing Transformer Parameters ===
                     # routing_num_clusters=4,  # sqrt(20) ≈ 4–5

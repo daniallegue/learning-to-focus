@@ -5,7 +5,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
     action_space_size = atari_env_action_space_map[env_id]
 
     collector_env_num = 8
-    game_segment_length = 20
+    game_segment_length = 400
     evaluator_env_num = 3
     num_simulations = 50
     max_env_step = int(1e5)
@@ -51,7 +51,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     # Set Hybrid to False
                     aha = False,
                     # Set window size
-                    local_window_size=128,
+                    local_window_size=64,
                     interleave_local_causal=False,
 
                     # === Routing Transformer Parameters ===

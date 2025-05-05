@@ -11,7 +11,7 @@ def main(env_id='FreewayNoFrameskip-v4', seed=0):
     # begin of the most frequently changed config specified by the user
     # ==============================================================
     collector_env_num = 8
-    game_segment_length = 20
+    game_segment_length = 400
     evaluator_env_num = 3
     num_simulations = 50
     max_env_step = int(1e5) # 100k steps for now
