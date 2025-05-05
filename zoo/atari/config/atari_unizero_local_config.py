@@ -52,6 +52,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     aha = False,
                     # Set window size
                     local_window_size=128,
+                    interleave_local_causal=False,
 
                     # === Routing Transformer Parameters ===
                     # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
