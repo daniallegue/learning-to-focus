@@ -12,7 +12,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
     batch_size = 64
     num_unroll_steps = 10
     infer_context_length = 8
-    num_layers = 8
+    num_layers = 4
     replay_ratio = 0.25
 
     atari_unizero_config = dict(
@@ -51,7 +51,7 @@ def main(env_id='BoxingNoFrameskip-v4', seed=0):
                     # Set Hybrid to False
                     aha = False,
                     # Set window size
-                    local_window_size=64,
+                    local_window_size=32,
                     interleave_local_causal=False,
 
                     # === Routing Transformer Parameters ===
