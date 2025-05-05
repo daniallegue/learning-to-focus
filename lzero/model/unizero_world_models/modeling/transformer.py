@@ -210,7 +210,7 @@ class Block(nn.Module):
         self.layer_idx = layer_idx
         # NOTE: GRU gating as in GTrXL
         self.gru_gating = config.gru_gating
-        self.gru_bias = 2.0
+        self.gru_bias = 1.0 # Fallback to 2.0
         if self.gru_gating:
             self.gate1 = GRUGatingUnit(config.embed_dim, self.gru_bias)
             self.gate2 = GRUGatingUnit(config.embed_dim, self.gru_bias)
@@ -224,8 +224,12 @@ class Block(nn.Module):
                 mode = 'local'
             else:
                 mode = 'adaptive'
+        elif config.interleave_local_causal:
+            # even layers → local window, odd → full causal
+            mode = 'local' if (layer_idx % 2 == 0) else 'causal'
         else:
             mode = config.attention
+
         cfg = copy.copy(config)
         cfg.attention = mode
         self.attn : Attention = build_attention(cfg) # Implements different attention mechanism

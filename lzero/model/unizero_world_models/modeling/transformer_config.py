@@ -50,9 +50,10 @@ class TransformerConfig:
     init_adaptive_span: Optional[float] = 64.0
     max_adaptive_span: Optional[int] = None
     adaptive_span_regularization: Optional[float] = 0.0 # regularization weight for adaptive span
-    aha : bool = True
+    aha : bool = False
     gru_gating : Optional[bool] = True
     hybrid_local_layers: Optional[int] = 4
+    interleave_local_causal : bool = False
 
 
     @property

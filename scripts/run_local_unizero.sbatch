@@ -10,7 +10,7 @@
 
 # Request 1 CPU per active thread of your program (assume 1 unless you specifically set this)
 # The default-per-cpu=1024
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=12
 
 #SBATCH --gpus-per-task=1
 
