@@ -61,7 +61,7 @@ class LocalAttention(Attention):
             self,
             x: torch.Tensor,
             kv_cache: Optional[KeysValues] = None,
-            valid_context_lengths: Optional[torch.Tensor] = None,
+            valid_ctx_len: Optional[torch.Tensor] = None,
             freqs_cis: torch.Tensor = None
     ) -> torch.Tensor:
         """
@@ -110,11 +110,11 @@ class LocalAttention(Attention):
         mask = mask.expand(B, self.num_heads, T, L + T).to(att.device)
 
         # 7) Carve out any *stale* cache slots for each sample
-        if valid_context_lengths is not None:
+        if valid_ctx_len is not None:
             # valid_context_lengths[i] tells us how many of the
             # LAST L positions are actually real
             for i in range(B):
-                valid = int(valid_context_lengths[i].item())
+                valid = int(valid_ctx_len[i].item())
                 stale = L - valid
                 if stale > 0:
                     # zero out mask for any of those stale positions
