@@ -24,14 +24,11 @@ class TransformerConfig:
     max_seq_len: int
     rotary_emb: bool = False
 
-    # TODO: Set default values for these parameters
     # Routing Attention Params
     # n : number of clusters
     routing_num_clusters: Optional[int] = None
     # m : recompute centroids every m layers or at forward
     routing_update_interval: Optional[int] = None
-    # whether to combine routing with local sliding-window attention
-    use_local_attention: bool = False
     # d : sliding-window size for pure local attention (if use_local_attention = True)
     local_window_size: Optional[int] = None
     # k : attend top-k keys in that cluster for that query
@@ -50,7 +47,7 @@ class TransformerConfig:
     init_adaptive_span: Optional[float] = 64.0
     max_adaptive_span: Optional[int] = None
     adaptive_span_regularization: Optional[float] = 0.0 # regularization weight for adaptive span
-    aha : bool = False
+    aha : bool = False # Whether to combine adaptive span with local attention
     gru_gating : Optional[bool] = True
     hybrid_local_layers: Optional[int] = 4
     interleave_local_causal : bool = False

@@ -34,98 +34,107 @@ class AdaptiveSpanAttention(Attention):
 
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__(config)
-        assert config.embed_dim % config.num_heads == 0, "Embedding dimension must be divisible by number of heads."
+        assert config.embed_dim % config.num_heads == 0, \
+            "Embedding dimension must be divisible by number of heads."
 
-        self.config = config
-        self.num_heads = config.num_heads
-        self.embed_dim = config.embed_dim
+        self.config   = config
+        self.num_heads= config.num_heads
         self.head_dim = config.embed_dim // config.num_heads
-        self.max_len = config.max_tokens
+        self.max_len  = config.max_tokens
 
-        # Number of bottom layers use as strict local attention
-        self.hybrid_local_layers: int = 1
-        self.aha : bool = True
-
-        # projectors
-        self.key = nn.Linear(config.embed_dim, config.embed_dim)
+        # projections
+        self.key   = nn.Linear(config.embed_dim, config.embed_dim)
         self.query = nn.Linear(config.embed_dim, config.embed_dim)
         self.value = nn.Linear(config.embed_dim, config.embed_dim)
 
-        # dropout & output projections
-        self.attn_drop = nn.Dropout(config.attn_pdrop)
+        # dropouts + out proj
+        self.attn_drop  = nn.Dropout(config.attn_pdrop)
         self.resid_drop = nn.Dropout(config.resid_pdrop)
-        self.proj = nn.Linear(config.embed_dim, config.embed_dim)
+        self.proj       = nn.Linear(config.embed_dim, config.embed_dim)
 
-        # adaptive span parameters
-        self.init_span = config.init_adaptive_span or config.local_window_size
-        inverse_softplus = lambda x : math.log(math.expm1(x))
-        self.init_p = inverse_softplus(self.init_span)
+        # learnable span parameters (in softplus domain)
+        init_span = config.init_adaptive_span or config.max_tokens # default value to max_tokens (i.e. 20)
+        inv_softplus = lambda x: math.log(math.expm1(x))
+        self.span_p = nn.Parameter(torch.full(
+            (self.num_heads,), inv_softplus(init_span) # define Torch param
+        ))
 
-        self.span_p = nn.Parameter(torch.full((self.num_heads, ), self.init_p))
+        # precompute full causal mask once
+        causal = torch.tril(torch.ones(self.max_len, self.max_len, dtype=torch.bool))
+        self.register_buffer('causal_mask', causal)
 
-    def forward(self, x: torch.Tensor, kv_cache: Optional[KeysValues] = None,
-                valid_context_lengths: Optional[torch.Tensor] = None, freqs_cis: torch.Tensor = None) -> torch.Tensor:
-        """
-        Forward pass for the adaptive span self-attention mechanism.
-
-        Arguments:
-            - x (:obj:`torch.Tensor`): Input tensor of shape (B, T, C) where B is batch size,
-                                        T is sequence length, and C is embedding dimension.
-            - kv_cache (:obj:`Optional[KeysValues]`): Optional key-value cache for faster inference.
-            - valid_context_lengths (:obj:`Optional[torch.Tensor]`): Optional tensor containing valid context lengths.
-            - freqs_cis (:obj:`torch.Tensor`): Frequency components for rotary position embeddings, used to modulate the attention mechanism (default: None).
-
-        Returns:
-            - torch.Tensor: Output tensor of shape (B, T, C).
-        """
-
+    def forward(
+        self,
+        x: torch.Tensor,
+        kv_cache: Optional[KeysValues] = None,
+        valid_ctx_len: Optional[torch.Tensor] = None,
+        freqs_cis: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         B, T, C = x.size()
         device = x.device
 
-        q = self.query(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)  # (B, nh, T, d)
-        k = self.key(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.value(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        # project Q, K, V
+        q = self.query(x).view(B, T, self.num_heads, self.head_dim).transpose(1,2)
+        k = self.key(x)  .view(B, T, self.num_heads, self.head_dim).transpose(1,2)
+        v = self.value(x).view(B, T, self.num_heads, self.head_dim).transpose(1,2)
 
-        if getattr(self.config, 'rotary_emb', False):
+        # apply rotary embeddings if used
+        if getattr(self.config, 'rotary_emb', False) and freqs_cis is not None:
             q, k = apply_rotary_emb(q, k, freqs_cis=freqs_cis)
 
+        # update cache
         if kv_cache is not None:
             kv_cache.update(k, v)
-            k, v = kv_cache.get()  # (B, nh, L+T, d)
-            L = k.size(-2) - T
+            k, v = kv_cache.get()  # (B, nh, L+T, head_dim)
+            L = k.shape[2] - T
         else:
-            L = 0  # no past context
+            L = 0
 
-        total_len = L + T  # number of keys available
+        total_len = L + T
 
-        scores = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(self.head_dim))  # (B, nh, T, total_len)
+        # raw attention scores
+        scores = (q @ k.transpose(-2,-1)) * (1.0 / math.sqrt(self.head_dim)) # (B, nh, T, total_len)
 
-        # adaptive attention masks
-        spans = F.softplus(self.span_p) # (nh, )
-        spans_int = spans.floor().clamp(max=self.max_len).long() # (nh, )
+        # apply causal mask and remove stale slots
+        #   slice out the T×(L+T) block
+        base = self.causal_mask[L:L+T, :L+T]  # (T, total_len)
+        if valid_ctx_len is not None:
+            m = torch.zeros(B, T, total_len, dtype=torch.bool, device=device)
+            for i in range(B):
+                valid = int(valid_ctx_len[i].item())
+                stale = L - valid
+                sub = base.clone()
+                if stale>0:
+                    sub[:, :stale] = False
+                m[i] = sub
+            mask = m.unsqueeze(1).expand(-1, self.num_heads, -1, -1)
+        else:
+            mask = base.unsqueeze(0).unsqueeze(1).expand(B, self.num_heads, -1, -1)
 
-        # computes pairwise distances |i-j| to check if attend
-        query_pos = torch.arange(L, L + T, device=device).unsqueeze(1)
-        key_pos = torch.arange(0, total_len, device=device).unsqueeze(0)
-        distances = (query_pos - key_pos).abs()  # (T, total_len)
+        #  adaptive‐span mask
+        spans = F.softplus(self.span_p)            # (nh,)
+        spans_int = spans.floor().clamp(max=self.max_len).long()
+        # positions in global indexing
+        qpos = torch.arange(L, L+T, device=device).unsqueeze(1)   # (T,1)
+        kpos = torch.arange(0, total_len, device=device).unsqueeze(0)  # (1, total_len)
+        dist  = (qpos - kpos).abs()                               # (T, total_len)
+        d_exp = dist.unsqueeze(0).expand(self.num_heads, -1, -1)  # (nh, T, total_len)
+        s_exp = spans_int.unsqueeze(1).unsqueeze(2)               # (nh,1,1)
+        adapt_mask = (d_exp <= s_exp)                             # (nh, T, total_len)
+        adapt_mask = adapt_mask.unsqueeze(0).expand(B, -1, -1, -1)
 
-        # masks
-        d_expanded = distances.unsqueeze(0).expand(self.num_heads, -1, -1)
-        spans_exp = spans_int.unsqueeze(1).unsqueeze(2)  # (nh, 1, 1)
-        head_mask = d_expanded <= spans_exp
+        # combine masks
+        final_mask = mask & adapt_mask
 
-        # expand (B, nh, T, total_len)
-        mask = head_mask.unsqueeze(0).expand(B, -1, -1, -1)
-        scores = scores.masked_fill(~mask, float("-inf"))
+        # apply mask, softmax, dropout
+        scores = scores.masked_fill(~final_mask, float('-inf'))
+        attn   = F.softmax(scores, dim=-1)
+        attn   = self.attn_drop(attn)
 
-        attn = F.softmax(scores, dim=-1)
-        attn = self.attn_drop(attn)
-
-        y = attn @ v  # (B, nh, T, d)
+        # attend and project
+        y = attn @ v                    # (B, nh, T, head_dim)
         y = rearrange(y, 'b h t d -> b t (h d)')
-
-        y = self.resid_drop(self.proj(y))
-        return y
+        return self.resid_drop(self.proj(y))
 
     @torch.no_grad()
     def get_attention_map(self, x: torch.Tensor, kv_cache: Optional[KeysValues] = None,
