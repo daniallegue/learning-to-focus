@@ -53,6 +53,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
                     # Set window size
                     local_window_size=8,
                     interleave_local_causal=False,
+                    adaptive_span_regularization=0.0,
 
                     # === Routing Transformer Parameters ===
                     # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
