@@ -16,6 +16,7 @@ from .tokenizer import Tokenizer
 from lzero.model.unizero_world_models.modeling.transformer import Transformer, TransformerConfig
 from lzero.model.unizero_world_models.modeling.adaptive_attention import AdaptiveSpanAttention
 from .utils import LossWithIntermediateLosses, init_weights, WorldModelOutput, hash_state
+from .attention_map import visualize_attention_maps
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -260,6 +261,7 @@ class WorldModel(nn.Module):
         self.num_layers = self.config.num_layers
         self.obs_per_embdding_dim = self.config.embed_dim
         self.sim_norm = SimNorm(simnorm_dim=self.group_size)
+        self.attn_plotted = False
 
     def _initialize_patterns(self) -> None:
         """Initialize patterns for block masks."""
@@ -1268,6 +1270,21 @@ class WorldModel(nn.Module):
         start_pos = batch['timestep']
         # Encode observations into latent state representations
         obs_embeddings = self.tokenizer.encode_to_obs_embeddings(batch['observations'])
+
+        # visualize attention maps
+        if not self.attn_plotted:
+            visualize_attention_maps(
+                model=self.transformer,
+                input_embeddings=obs_embeddings,  # (B, T, C)
+                kv_cache=None,  # full-context
+                valid_context_lengths=None,
+                suffix='compute_loss_initial_attention',
+                nhead_each_row=4
+            )
+
+            # # Only plot once
+            # self.attn_plotted = True
+
 
         # ========= for visual analysis =========
         # Uncomment the lines below for visual analysis in Pong

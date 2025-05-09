@@ -136,32 +136,64 @@ class LocalAttention(Attention):
         y = rearrange(y, 'b h t d -> b t (h d)')
         return self.resid_drop(self.proj(y))
 
-
     @torch.no_grad()
-    def get_attention_map(self,
-                          x: torch.Tensor,
-                          kv_cache: Optional[KeysValues] = None,
-                          valid_ctx_lengths: Optional[torch.Tensor] = None
-                          ) -> torch.Tensor:
+    def get_attention_map(
+            self,
+            x: torch.Tensor,
+            kv_cache: Optional[KeysValues] = None,
+            valid_ctx_len: Optional[torch.Tensor] = None,
+            freqs_cis: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         B, T, C = x.shape
+        device = x.device
+
+        # 1) project Q and fresh K just like forward
+        q = self.query(x).view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
+        k_fresh = self.key(x).view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
+
+        # 2) apply rotary if enabled
+        if getattr(self.config, 'rotary_emb', False) and freqs_cis is not None:
+            q, k_fresh = apply_rotary_emb(q, k_fresh, freqs_cis=freqs_cis)
+
+        # 3) combine with cached keys (read-only)
         if kv_cache is not None:
-            b, nh, L, c = kv_cache.shape
-            kv_cache.update(*[t.view(B, nh, T, C // nh).transpose(1, 2)
-                              for t in (self.query(x), self.key(x), self.value(x))][:2])
-            k, v = kv_cache.get()
+            k_old, _ = kv_cache.get()  # (B, nh, L, head_dim)
+            k = torch.cat([k_old, k_fresh], dim=2)  # (B, nh, L+T, head_dim)
+            L = k_old.shape[2]
         else:
+            k = k_fresh
             L = 0
 
-        q = self.query(x).view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
-        k = self.key(x).view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
+        total_len = L + T
 
-        # raw scores
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        # 4) raw attention scores
+        scores = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))  # (B, nh, T, total_len)
 
-        # local mask
-        mask = self.mask[L:L + T, :L + T]
-        mask = mask.unsqueeze(0).unsqueeze(1).expand(B, self.num_heads, T, L + T).to(att.device)
-        att = att.masked_fill(~mask, float('-inf'))
-        att = F.softmax(att, dim=-1)
+        # 5) build causal + stale‐entry mask
+        base = self.mask[L: L + T, : L + T]  # (T, total_len)
+        if valid_ctx_len is not None:
+            mask_bt = torch.zeros(B, T, total_len, device=device, dtype=torch.bool)
+            for i in range(B):
+                valid = int(valid_ctx_len[i].item())
+                stale = L - valid
+                sub = base.clone()
+                if stale > 0:
+                    sub[:, :stale] = False
+                mask_bt[i] = sub
+            mask = mask_bt.unsqueeze(1).expand(-1, self.num_heads, -1, -1)
+        else:
+            mask = base.unsqueeze(0).unsqueeze(1).expand(B, self.num_heads, T, total_len)
 
-        return att
+        # 6) apply local‐window constraint
+        if self.window is not None:
+            qpos = torch.arange(L, L + T, device=device).unsqueeze(1)  # (T,1)
+            kpos = torch.arange(0, total_len, device=device).unsqueeze(0)  # (1, total_len)
+            wmask = (qpos - kpos).abs() <= self.window  # (T, total_len)
+            wmask = wmask.unsqueeze(0).unsqueeze(1).expand(B, self.num_heads, T, total_len)
+            mask = mask & wmask
+
+        # 7) mask out and softmax
+        scores = scores.masked_fill(~mask, float('-inf'))
+        attn = torch.softmax(scores, dim=-1)
+
+        return attn  # shape (B, nh, T, total_len)
