@@ -1282,8 +1282,8 @@ class WorldModel(nn.Module):
                 nhead_each_row=4
             )
 
-            # # Only plot once
-            # self.attn_plotted = True
+            # Only plot once
+            self.attn_plotted = True
 
 
         # ========= for visual analysis =========
@@ -1542,6 +1542,14 @@ class WorldModel(nn.Module):
         reg_loss = self.config.adaptive_span_regularization * span_reg
         discounted_loss_policy = discounted_loss_policy + reg_loss
 
+        # log span
+        span_metrics = {}
+        for ℓ, block in enumerate(self.transformer.blocks):
+            attn = block.attn
+            if isinstance(attn, AdaptiveSpanAttention):
+                spans = F.softplus(attn.span_p).detach()  # tensor (nh,)
+                span_metrics[f"span_layer_{ℓ}"] = spans.cpu()
+
 
         if self.continuous_action_space:
             return LossWithIntermediateLosses(
@@ -1565,6 +1573,7 @@ class WorldModel(nn.Module):
                 policy_mu=mu,
                 policy_sigma=sigma,
                 target_sampled_actions=target_sampled_actions,
+                span_metrics = span_metrics
             )
         else:
             return LossWithIntermediateLosses(
@@ -1585,6 +1594,7 @@ class WorldModel(nn.Module):
                 dormant_ratio_encoder=dormant_ratio_encoder,
                 dormant_ratio_world_model=dormant_ratio_world_model,
                 latent_state_l2_norms=latent_state_l2_norms,
+                span_metrics = span_metrics
             )
 
     # TODO: test correctness
