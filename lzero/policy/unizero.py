@@ -19,6 +19,7 @@ from lzero.policy import scalar_transform, InverseScalarTransform, phi_transform
 from lzero.policy.muzero import MuZeroPolicy
 from .utils import configure_optimizers_nanogpt
 from ..model.unizero_world_models.modeling.adaptive_attention import AdaptiveSpanAttention
+from ..model.unizero_world_models.modeling.gaam import GAAM
 
 
 @POLICY_REGISTRY.register('unizero')
@@ -577,6 +578,15 @@ class UniZeroPolicy(MuZeroPolicy):
             if isinstance(attn, AdaptiveSpanAttention):
                 spans = F.softplus(attn.span_p).detach().cpu().tolist()  # one float per head
                 return_log_dict[f"adaptive_span/layer_{layer_id}"] = spans
+
+        # Adds learned params for GAAM
+        for layer_id, block in enumerate(self._learn_model.world_model.transformer.blocks):
+            attn = block.attn
+            if isinstance(attn, GAAM):
+                sigmas = F.softplus(attn.sigma_p).detach().cpu().tolist()
+                mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu().tolist()
+                return_log_dict[f"gaam_sigma/layer_{layer_id}"] = sigmas
+                return_log_dict[f"gaam_mu/layer_{layer_id}"] = mus
 
         # Log attention map to wandb
         if not self.attn_logged and self.attn_plotted:
