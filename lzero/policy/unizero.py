@@ -453,6 +453,24 @@ class UniZeroPolicy(MuZeroPolicy):
         for loss_name, loss_value in losses.intermediate_losses.items():
             self.intermediate_losses[f"{loss_name}"] = loss_value
 
+        weighted_total_loss = losses.loss_total
+
+        span_vals = []
+        for block in self._learn_model.world_model.transformer.blocks:
+            attn = block.attn
+            if isinstance(attn, AdaptiveSpanAttention):
+                span_vals.append(F.softplus(attn.span_p).mean())
+        if span_vals:
+            span_reg = torch.stack(span_vals).mean()
+        else:
+            span_reg = torch.tensor(0.0, device=weighted_total_loss.device)
+
+        reg_loss = self._cfg.model.world_model_cfg.adaptive_span_regularization * span_reg
+        weighted_total_loss = weighted_total_loss + reg_loss
+
+        for loss_name, loss_value in losses.intermediate_losses.items():
+            self.intermediate_losses[f"{loss_name}"] = loss_value
+
         obs_loss = self.intermediate_losses['loss_obs']
         reward_loss = self.intermediate_losses['loss_rewards']
         policy_loss = self.intermediate_losses['loss_policy']
@@ -575,8 +593,9 @@ class UniZeroPolicy(MuZeroPolicy):
         for layer_id, block in enumerate(self._learn_model.world_model.transformer.blocks):
             attn = block.attn
             if isinstance(attn, AdaptiveSpanAttention):
-                spans = F.softplus(attn.span_p).detach().cpu().tolist()  # one float per head
-                return_log_dict[f"adaptive_span/layer_{layer_id}"] = spans
+                spans = F.softplus(attn.span_p).detach().cpu().tolist()
+                for head_id, span in enumerate(spans):
+                    return_log_dict[f"adaptive_span/layer_{layer_id}/head_{head_id}"] = float(span)
 
         # Log attention map to wandb
         if not self.attn_logged and self.attn_plotted:
