@@ -1539,7 +1539,7 @@ class WorldModel(nn.Module):
             attn = block.attn
             if isinstance(attn, AdaptiveSpanAttention):
                 span_reg += F.softplus(attn.span_p).sum()
-            if isinstance(attn, GAAM):
+            elif isinstance(attn, GAAM):
                 span_reg += F.softplus(attn.sigma_p).sum()
 
         reg_loss = self.config.adaptive_span_regularization * span_reg # O if not used
@@ -1566,8 +1566,7 @@ class WorldModel(nn.Module):
                                     + 2 * (torch.log(s_j) - torch.log(s_i))
                             )
                             div_reg += kl_ij
-            discounted_loss_policy = discounted_loss_policy \
-                                     + self.config.gaam_span_diversity_coeff * div_reg
+            discounted_loss_policy += self.config.gaam_span_diversity_coeff * div_reg
 
         # log span
         span_metrics = {}
@@ -1576,7 +1575,7 @@ class WorldModel(nn.Module):
             if isinstance(attn, AdaptiveSpanAttention):
                 spans = F.softplus(attn.span_p).detach()  # tensor (nh,)
                 span_metrics[f"span_layer_{ℓ}"] = spans.cpu()
-            if isinstance(attn, GAAM):
+            elif isinstance(attn, GAAM):
                 # only log them if the layers are GAAM
                 sigmas = F.softplus(attn.sigma_p).detach().cpu()
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu()
