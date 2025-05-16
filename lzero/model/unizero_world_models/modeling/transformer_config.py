@@ -48,6 +48,11 @@ class TransformerConfig:
     init_adaptive_sigma: Optional[float] = 1.0  # where to initialize each head’s variance (before softplus)
     gaam_span_diversity_coeff: float = 0.0 # diversity regularization for GAAM
 
+    # MGK Params
+    num_mixtures: Optional[int] = 2
+    init_mgk_sigma: Optional[float] = 1.0 # intializes sigma before softplus
+    mgk_pi_entropy_coeff : float = 0.0 # entropy regularization for mixture weights
+
     @property
     def max_tokens(self):
         return self.tokens_per_block * self.max_blocks

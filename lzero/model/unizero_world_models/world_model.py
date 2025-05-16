@@ -12,6 +12,7 @@ from lzero.model.common import SimNorm
 from lzero.model.utils import cal_dormant_ratio
 from lzero.model.unizero_world_models.modeling.kv_caching import KeysValues
 from .modeling.gaam import GAAM
+from .modeling.mgk import MGK
 from .slicer import Head, PolicyHeadCont
 from .tokenizer import Tokenizer
 from lzero.model.unizero_world_models.modeling.transformer import Transformer, TransformerConfig
@@ -1568,6 +1569,20 @@ class WorldModel(nn.Module):
                             div_reg += kl_ij
             discounted_loss_policy += self.config.gaam_span_diversity_coeff * div_reg
 
+        # MGK entropy regularization
+        # We encourage balanced use over different mixtures, to avoid winner-takes-all (peak) behaviour
+        if self.config.mgk_pi_entropy_coeff > 0:
+            entropy_reg = 0.0
+            for block in self.transformer.blocks:
+                attn = block.attn
+                if isinstance(attn, MGK):
+                    pi = F.softmax(attn.pi_p, dim=-1) # π_h
+                    # entropy per head: −∑_r π_hr log π_hr
+                    head_ent = -(pi * torch.log(pi + 1e-8)).sum(dim=-1)  # (nh,)
+                    entropy_reg += head_ent.sum()
+            # subtract because higher entropy → lower loss
+            discounted_loss_policy = discounted_loss_policy - self.config.mgk_pi_entropy_coeff * entropy_reg
+
         # log span
         span_metrics = {}
         for ℓ, block in enumerate(self.transformer.blocks):
@@ -1581,6 +1596,15 @@ class WorldModel(nn.Module):
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu()
                 span_metrics[f"gaam_sigma_layer_{ℓ}"] = sigmas
                 span_metrics[f"gaam_mu_layer_{ℓ}"] = mus
+            elif isinstance(attn, MGK):
+                pi = F.softmax(attn.pi_p, dim=-1).detach().cpu()
+                ent = -(pi * torch.log(pi + 1e-8)).sum(dim=-1).detach().cpu()
+                sigmas = F.softplus(attn.sigma_p).detach().cpu()
+                biases = attn.key_bias.detach().cpu()
+                span_metrics[f"mgk_pi_layer_{ℓ}"] = pi
+                span_metrics[f"mgk_pi_entropy_layer_{ℓ}"] = ent
+                span_metrics[f"mgk_sigma_layer_{ℓ}"] = sigmas
+                span_metrics[f"mgk_bias_layer_{ℓ}"] = biases
 
 
         if self.continuous_action_space:
