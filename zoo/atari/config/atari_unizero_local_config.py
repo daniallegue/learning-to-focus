@@ -54,16 +54,6 @@ def main(env_id='PongNoFrameskip-v4', seed=0, local_window_size = 4):
                     local_window_size=local_window_size,
                     interleave_local_causal=False,
                     adaptive_span_regularization=0.0,
-
-                    # === Routing Transformer Parameters ===
-                    # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
-                    # routing_update_interval=1,
-                    # routing_topk=32,
-                    # routing_decay=0.999,
-                    # routing_commitment=1e-4,
-                    # routing_num_mem_kv=0,
-                    # use_local_attention=False,
-                    # routing_context_window_size=4,  # optional: match routing window
                 ),
             ),
             model_path=None,
@@ -110,5 +100,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some environment.')
     parser.add_argument('--env', type=str, help='The environment to use', default='BoxingNoFrameskip-v4')
     parser.add_argument('--seed', type=int, help='The seed to use', default=0)
+    parser.add_argument('--local_window_size', type=int, help='The local window size', default=4)
     args = parser.parse_args()
     main(args.env, args.seed)

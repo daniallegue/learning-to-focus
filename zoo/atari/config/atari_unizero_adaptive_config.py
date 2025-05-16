@@ -115,5 +115,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some environment.')
     parser.add_argument('--env', type=str, help='The environment to use', default='BoxingNoFrameskip-v4')
     parser.add_argument('--seed', type=int, help='The seed to use', default=0)
+    parser.add_argument('--init_span', type=int, help='The intial adaptive span', default=2)
     args = parser.parse_args()
     main(args.env, args.seed)
