@@ -1,7 +1,7 @@
 from easydict import EasyDict
 from zoo.atari.config.atari_env_action_space_map import atari_env_action_space_map
 
-def main(env_id='PongNoFrameskip-v4', seed=0):
+def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
     action_space_size = atari_env_action_space_map[env_id]
 
     collector_env_num = 8
@@ -56,7 +56,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
                     hybrid_local_layers= 0,
 
                     # Adaptive span parameters
-                    init_adaptive_span=20.0, # Start with full causal attention
+                    init_adaptive_span=init_span,
                     max_adaptive_span=20.0,
                     adaptive_span_regularization=1e-3,
 
