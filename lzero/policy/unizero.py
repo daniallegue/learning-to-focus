@@ -598,24 +598,24 @@ class UniZeroPolicy(MuZeroPolicy):
                     return_log_dict[f"adaptive_span/layer_{layer_id}/head_{head_id}"] = float(span)
 
         # Log attention map to wandb
-        if not self.attn_logged and self.attn_plotted:
-            base_dir = '/home/ddediosallegue/projects/UniZero'
-            suffix = 'compute_loss_initial_attention'
-            # nhead_each_row was 4 in your call above
-            fn = f'{suffix}/attn_maps_4-each-row.png'
-            file_path = os.path.join(base_dir, fn)
-
-            # Creates artifact
-            art = wandb.Artifact(
-                name="attn_maps_initial_attention",
-                type="attention-maps",
-                description="Attention maps (all heads & layers) for the initial compute_loss batch"
-            )
-
-            art.add_file(file_path)
-            wandb.log_artifact(art)
-
-            self._attn_uploaded = True # Only once
+        # if not self.attn_logged and self.attn_plotted:
+        #     base_dir = '/home/ddediosallegue/projects/UniZero'
+        #     suffix = 'compute_loss_initial_attention'
+        #     # nhead_each_row was 4 in your call above
+        #     fn = f'{suffix}/attn_maps_4-each-row.png'
+        #     file_path = os.path.join(base_dir, fn)
+        #
+        #     # Creates artifact
+        #     art = wandb.Artifact(
+        #         name="attn_maps_initial_attention",
+        #         type="attention-maps",
+        #         description="Attention maps (all heads & layers) for the initial compute_loss batch"
+        #     )
+        #
+        #     art.add_file(file_path)
+        #     wandb.log_artifact(art)
+        #
+        #     self.attn_logged = True # Only once
         
         if self._cfg.use_wandb:
             wandb.log({'learner_step/' + k: v for k, v in return_log_dict.items()}, step=self.env_step)
