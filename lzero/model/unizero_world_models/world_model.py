@@ -1272,18 +1272,18 @@ class WorldModel(nn.Module):
         obs_embeddings = self.tokenizer.encode_to_obs_embeddings(batch['observations'])
 
         # visualize attention maps
-        # if not self.attn_plotted:
-        #     visualize_attention_maps(
-        #         model=self.transformer,
-        #         input_embeddings=obs_embeddings,  # (B, T, C)
-        #         kv_cache=None,  # full-context
-        #         valid_context_lengths=None,
-        #         suffix='compute_loss_initial_attention',
-        #         nhead_each_row=4
-        #     )
-        #
-        #     # Only plot once
-        #     self.attn_plotted = True
+        if not self.attn_plotted:
+            visualize_attention_maps(
+                model=self.transformer,
+                input_embeddings=obs_embeddings,  # (B, T, C)
+                kv_cache=None,  # full-context
+                valid_context_lengths=None,
+                suffix='compute_loss_initial_attention',
+                nhead_each_row=4
+            )
+
+            # Only plot once
+            self.attn_plotted = True
 
 
         # ========= for visual analysis =========

@@ -598,24 +598,36 @@ class UniZeroPolicy(MuZeroPolicy):
                     return_log_dict[f"adaptive_span/layer_{layer_id}/head_{head_id}"] = float(span)
 
         # Log attention map to wandb
-        # if not self.attn_logged and self.attn_plotted:
-        #     base_dir = '/home/ddediosallegue/projects/UniZero'
-        #     suffix = 'compute_loss_initial_attention'
-        #     # nhead_each_row was 4 in your call above
-        #     fn = f'{suffix}/attn_maps_4-each-row.png'
-        #     file_path = os.path.join(base_dir, fn)
-        #
-        #     # Creates artifact
-        #     art = wandb.Artifact(
-        #         name="attn_maps_initial_attention",
-        #         type="attention-maps",
-        #         description="Attention maps (all heads & layers) for the initial compute_loss batch"
-        #     )
-        #
-        #     art.add_file(file_path)
-        #     wandb.log_artifact(art)
-        #
-        #     self.attn_logged = True # Only once
+        if not self.attn_logged and self.attn_plotted:
+            cfg = self._cfg.model.world_model_cfg
+            cfg_id = (
+                f"{cfg.attention}"
+                f"_L{cfg.num_layers}"
+                f"_H{cfg.num_heads}"
+                f"_E{cfg.embed_dim}"
+                f"_{cfg.tokens_per_block}x{cfg.max_blocks}"
+            )
+
+            base_dir = '/home/ddediosallegue/projects/UniZero'
+            suffix = 'compute_loss_initial_attention'
+            nhead_each_row = 4  # keep this in sync with your plotting call
+
+            # now include cfg_id in the filename
+            fn = f'{suffix}/attn_maps_{cfg_id}_{nhead_each_row}-each-row.png'
+            file_path = os.path.join(base_dir, fn)
+
+            # Creates artifact
+            art = wandb.Artifact(
+                name="attn_maps_initial_attention",
+                type="attention-maps",
+                description=(
+                    "Attention maps (all heads & layers) for the initial "
+                    f"compute_loss batch [{cfg_id}]"
+                )
+            )
+
+            art.add_file(file_path)
+            wandb.log_artifact(art)
         
         if self._cfg.use_wandb:
             wandb.log({'learner_step/' + k: v for k, v in return_log_dict.items()}, step=self.env_step)
