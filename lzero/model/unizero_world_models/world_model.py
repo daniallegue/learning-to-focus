@@ -1542,8 +1542,6 @@ class WorldModel(nn.Module):
             if isinstance(attn, AdaptiveSpanAttention):
                 # F.softplus yields the continuous span per head; .mean() averages across heads
                 span_vals.append(F.softplus(attn.span_p).mean())
-            elif isinstance(attn, GAAM):
-                span_reg += F.softplus(attn.sigma_p).sum()
 
         if span_vals:
             span_reg = torch.stack(span_vals).mean()
