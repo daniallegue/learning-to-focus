@@ -1273,6 +1273,7 @@ class WorldModel(nn.Module):
         obs_embeddings = self.tokenizer.encode_to_obs_embeddings(batch['observations'])
 
         # visualize attention maps
+        self.attn_plotted = True #TODO: Remove eventually
         if not self.attn_plotted:
             visualize_attention_maps(
                 model=self.transformer,

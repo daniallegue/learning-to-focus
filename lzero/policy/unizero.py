@@ -456,42 +456,6 @@ class UniZeroPolicy(MuZeroPolicy):
 
         weighted_total_loss = losses.loss_total
 
-        span_vals = []
-        for block in self._learn_model.world_model.transformer.blocks:
-            attn = block.attn
-            if isinstance(attn, AdaptiveSpanAttention):
-                span_vals.append(F.softplus(attn.span_p).mean())
-        if span_vals:
-            span_reg = torch.stack(span_vals).mean()
-        else:
-            span_reg = torch.tensor(0.0, device=weighted_total_loss.device)
-
-        if self._cfg.model.world_model_cfg.gaam_span_diversity_coeff > 0:
-            div_reg = 0.0
-            for block in self._learn_model.world_model.transformer.blocks:
-                attn = block.attn
-                if isinstance(attn, GAAM):
-                    sigmas = F.softplus(attn.sigma_p)  # (nh,)
-                    mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len)  # (nh,)
-                    H = sigmas.size(0)
-                    for i in range(H):
-                        for j in range(i + 1, H):
-                            s_i, s_j = sigmas[i], sigmas[j]
-                            m_i, m_j = mus[i], mus[j]
-                            kl_ij = 0.5 * (
-                                    (s_i ** 2) / (s_j ** 2)
-                                    + ((m_j - m_i) ** 2) / (s_j ** 2)
-                                    - 1
-                                    + 2 * (torch.log(s_j) - torch.log(s_i))
-                            )
-                            div_reg += kl_ij
-            coeff = self._cfg.model.world_model_cfg.gaam_span_diversity_coeff
-            weighted_total_loss = weighted_total_loss + coeff * div_reg
-            self.intermediate_losses['gaam_diversity_reg'] = div_reg.item()
-
-        reg_loss = self._cfg.model.world_model_cfg.adaptive_span_regularization * span_reg
-        weighted_total_loss = weighted_total_loss + reg_loss
-
         for loss_name, loss_value in losses.intermediate_losses.items():
             self.intermediate_losses[f"{loss_name}"] = loss_value
 
@@ -631,6 +595,7 @@ class UniZeroPolicy(MuZeroPolicy):
                 return_log_dict[f"gaam_mu/layer_{layer_id}"] = mus
 
         # Log attention map to wandb
+        self.attn_logged = True # TODO: Remove eventually
         if not self.attn_logged and self.attn_plotted:
             cfg = self._cfg.model.world_model_cfg
             cfg_id = (

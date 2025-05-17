@@ -60,7 +60,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
                     # Gaussian Attention Parameters
                     init_adaptive_mu = 4.0,  # head’s mean offset
                     init_adaptive_sigma = 1.0,  # head’s variance (before softplus)
-                    gaam_span_diversity_coeff = 1e-3  # diversity regularization
+                    gaam_span_diversity_coeff = 0.0  # diversity regularization, none for now
                 ),
             ),
             model_path=None,

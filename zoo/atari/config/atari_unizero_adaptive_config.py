@@ -59,16 +59,6 @@ def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
                     init_adaptive_span=init_span,
                     max_adaptive_span=20.0,
                     adaptive_span_regularization=1e-3,
-
-                    # === Routing Transformer Parameters ===
-                    # routing_num_clusters=4,  # sqrt(20) ≈ 4–5
-                    # routing_update_interval=1,
-                    # routing_topk=32,
-                    # routing_decay=0.999,
-                    # routing_commitment=1e-4,
-                    # routing_num_mem_kv=0,
-                    # use_local_attention=False,
-                    # routing_context_window_size=4,  # optional: match routing window
                 ),
             ),
             model_path=None,
