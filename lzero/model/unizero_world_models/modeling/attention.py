@@ -41,8 +41,5 @@ def build_attention(config: TransformerConfig) -> Attention:
     elif attention_mode == 'gaam':
         from .gaam import GAAM
         return GAAM(config)
-    elif attention_mode == 'mgk':
-        from .mgk import MGK
-        return MGK(config)
     else:
         raise ValueError(f"Unknown attention type: {config.attention}")
