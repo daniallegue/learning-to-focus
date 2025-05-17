@@ -1534,13 +1534,20 @@ class WorldModel(nn.Module):
         discounted_policy_entropy = (policy_entropy.view(-1, batch['actions'].shape[1]) * discounts).sum()/ batch['mask_padding'].sum()
 
         # Adaptive-span regularization
+        span_vals = []
         span_reg = 0.0
         for block in self.transformer.blocks:
             attn = block.attn
             if isinstance(attn, AdaptiveSpanAttention):
-                span_reg += F.softplus(attn.span_p).sum()
+                # F.softplus yields the continuous span per head; .mean() averages across heads
+                span_vals.append(F.softplus(attn.span_p).mean())
             elif isinstance(attn, GAAM):
                 span_reg += F.softplus(attn.sigma_p).sum()
+
+        if span_vals:
+            span_reg = torch.stack(span_vals).mean()
+        else:
+            span_reg = torch.tensor(0.0, device=discounted_loss_policy.device)
 
         reg_loss = self.config.adaptive_span_regularization * span_reg # O if not used
         discounted_loss_policy = discounted_loss_policy + reg_loss
@@ -1581,16 +1588,6 @@ class WorldModel(nn.Module):
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu()
                 span_metrics[f"gaam_sigma_layer_{ℓ}"] = sigmas
                 span_metrics[f"gaam_mu_layer_{ℓ}"] = mus
-            elif isinstance(attn, MGK):
-                pi = F.softmax(attn.pi_p, dim=-1).detach().cpu()
-                ent = -(pi * torch.log(pi + 1e-8)).sum(dim=-1).detach().cpu()
-                sigmas = F.softplus(attn.sigma_p).detach().cpu()
-                biases = attn.key_bias.detach().cpu()
-                span_metrics[f"mgk_pi_layer_{ℓ}"] = pi
-                span_metrics[f"mgk_pi_entropy_layer_{ℓ}"] = ent
-                span_metrics[f"mgk_sigma_layer_{ℓ}"] = sigmas
-                span_metrics[f"mgk_bias_layer_{ℓ}"] = biases
-
 
         if self.continuous_action_space:
             return LossWithIntermediateLosses(
