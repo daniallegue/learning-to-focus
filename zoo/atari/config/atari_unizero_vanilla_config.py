@@ -13,7 +13,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
     game_segment_length = 400
     evaluator_env_num = 3
     num_simulations = 50
-    max_env_step = int(1e5)
+    max_env_step = 105000
     batch_size = 64
     num_unroll_steps = 10
     infer_context_length = 4 # H
@@ -70,10 +70,9 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
                     obs_type='image',
                     env_num=max(collector_env_num, evaluator_env_num),
                     rotary_emb=False,
-                    aha = False,
-                    interleave_local_causal = False,
-                    local_window_size = 8,
-                    adaptive_span_regularization=0,
+                    adapt_span_ramp=0.0,
+                    adapt_span_loss = 0.0,
+                    local_window_size = 20,
                 ),
             ),
             model_path=None,

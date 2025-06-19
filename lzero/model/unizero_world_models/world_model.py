@@ -1272,22 +1272,6 @@ class WorldModel(nn.Module):
         # Encode observations into latent state representations
         obs_embeddings = self.tokenizer.encode_to_obs_embeddings(batch['observations'])
 
-        # visualize attention maps
-        self.attn_plotted = True #TODO: Remove eventually
-        if not self.attn_plotted:
-            visualize_attention_maps(
-                model=self.transformer,
-                input_embeddings=obs_embeddings,  # (B, T, C)
-                kv_cache=None,  # full-context
-                valid_context_lengths=None,
-                suffix='compute_loss_initial_attention',
-                nhead_each_row=4
-            )
-
-            # Only plot once
-            self.attn_plotted = True
-
-
         # ========= for visual analysis =========
         # Uncomment the lines below for visual analysis in Pong
         # self.plot_latent_tsne_each_and_all_for_pong(obs_embeddings, suffix='pong_H10_H4_tsne')
@@ -1535,8 +1519,10 @@ class WorldModel(nn.Module):
         discounted_policy_entropy = (policy_entropy.view(-1, batch['actions'].shape[1]) * discounts).sum()/ batch['mask_padding'].sum()
 
         # Adaptive-span regularization
+        R = self.config.adapt_span_ramp
+        alpha = min(1.0, float(self.global_step) / float(R))
+
         span_vals = []
-        span_reg = 0.0
         for block in self.transformer.blocks:
             attn = block.attn
             if isinstance(attn, AdaptiveSpanAttention):
@@ -1548,31 +1534,8 @@ class WorldModel(nn.Module):
         else:
             span_reg = torch.tensor(0.0, device=discounted_loss_policy.device)
 
-        reg_loss = self.config.adaptive_span_regularization * span_reg # O if not used
+        reg_loss = self.config.adapt_span_loss * span_reg * alpha
         discounted_loss_policy = discounted_loss_policy + reg_loss
-
-        # GAAM span diversity regularization
-        if self.config.gaam_span_diversity_coeff > 0:
-            div_reg = 0.0
-            for block in self.transformer.blocks:
-                attn = block.attn
-                if isinstance(attn, GAAM):
-                    sigmas = F.softplus(attn.sigma_p)  # (nh,)
-                    mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len)  # (nh,)
-                    H = sigmas.size(0)
-                    for i in range(H):
-                        for j in range(i + 1, H):
-                            s_i, s_j = sigmas[i], sigmas[j]
-                            m_i, m_j = mus[i], mus[j]
-                            # KL[N(m_i,s_i²) || N(m_j,s_j²)]
-                            kl_ij = 0.5 * (
-                                    (s_i ** 2) / (s_j ** 2)
-                                    + ((m_j - m_i) ** 2) / (s_j ** 2)
-                                    - 1
-                                    + 2 * (torch.log(s_j) - torch.log(s_i))
-                            )
-                            div_reg += kl_ij
-            discounted_loss_policy += self.config.gaam_span_diversity_coeff * div_reg
 
         # log span
         span_metrics = {}

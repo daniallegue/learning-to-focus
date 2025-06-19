@@ -8,7 +8,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
     game_segment_length = 400
     evaluator_env_num = 3
     num_simulations = 50
-    max_env_step = int(1e5)
+    max_env_step = 105000
     batch_size = 64
     num_unroll_steps = 10
     infer_context_length = 4
@@ -48,17 +48,15 @@ def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
                     obs_type='image',
                     env_num=max(collector_env_num, evaluator_env_num),
                     rotary_emb=False,
-                    # Set Hybrid to False
-                    aha = False,
+
                     # Set window size
-                    local_window_size=8,
-                    interleave_local_causal=False,
-                    hybrid_local_layers= 0,
+                    local_window_size=20,
 
                     # Adaptive span parameters
-                    init_adaptive_span=init_span,
-                    max_adaptive_span=20.0,
-                    adaptive_span_regularization=1e-3,
+                    max_adaptive_span= 20.0,
+                    init_adaptive_span=float(init_span),  # Initial adaptive span
+                    adapt_span_ramp=3.0,
+                    adapt_span_loss=0.0025
                 ),
             ),
             model_path=None,
@@ -70,7 +68,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
             train_start_after_envsteps=2000,
             game_segment_length=game_segment_length,
             replay_buffer_size=int(1e6),
-            eval_freq=10000,
+            eval_freq=20000,
             collector_env_num=collector_env_num,
             evaluator_env_num=evaluator_env_num,
             use_wandb=True,
