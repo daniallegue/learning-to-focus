@@ -134,6 +134,9 @@ class WorldModel(nn.Module):
 
         self.reanalyze_phase = False
 
+        # Adaptive ramp tracking
+        self._ramp_step = 0
+
     def custom_copy_kv_cache_to_shared_init_envs(self, src_kv: KeysValues, env_id) -> int:
         """
         Overview:
@@ -1520,7 +1523,7 @@ class WorldModel(nn.Module):
 
         # Adaptive-span regularization
         R = self.config.adapt_span_ramp
-        alpha = min(1.0, float(self.global_step) / float(R))
+        alpha = min(1.0, float(self._ramp_step) / float(R))
 
         span_vals = []
         for block in self.transformer.blocks:
@@ -1551,6 +1554,7 @@ class WorldModel(nn.Module):
                 span_metrics[f"gaam_sigma_layer_{ℓ}"] = sigmas
                 span_metrics[f"gaam_mu_layer_{ℓ}"] = mus
 
+        self._ramp_step += 1
         if self.continuous_action_space:
             return LossWithIntermediateLosses(
                 latent_recon_loss_weight=self.latent_recon_loss_weight,
