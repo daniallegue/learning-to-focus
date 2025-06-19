@@ -1457,3 +1457,9 @@ zoo/jericho/envs/z-machine-games-master
 
 # wandb logs
 wandb/
+
+results/
+
+atari-env/
+
+plots/
