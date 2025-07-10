@@ -17,8 +17,7 @@ from .tokenizer import Tokenizer
 from lzero.model.unizero_world_models.modeling.transformer import Transformer, TransformerConfig
 from lzero.model.unizero_world_models.modeling.adaptive_attention import AdaptiveSpanAttention
 from .utils import LossWithIntermediateLosses, init_weights, WorldModelOutput, hash_state
-from .visualize_utils import visualize_reward_value_img_policy, visualize_sequence_only
-from .attention_map import visualize_attention_maps, visualize_attention_map
+from .attention_map import visualize_attention_maps
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -134,7 +133,9 @@ class WorldModel(nn.Module):
         self.shared_pool_index_wm = 0
 
         self.reanalyze_phase = False
-        self.last_obs_embeddings = []
+
+        # Adaptive ramp tracking
+        self._ramp_step = 0
 
     def custom_copy_kv_cache_to_shared_init_envs(self, src_kv: KeysValues, env_id) -> int:
         """
@@ -147,7 +148,7 @@ class WorldModel(nn.Module):
             - index (:obj:`int`): The index in the shared pool where the KeysValues object is stored.
         """
         src_kv_shape = src_kv._keys_values[0]._k_cache._cache.shape
-        
+
         if self.shared_pool_init_infer[env_id][self.shared_pool_index_init_envs[env_id]] is None:
             self.shared_pool_init_infer[env_id][self.shared_pool_index_init_envs[env_id]] = KeysValues(
                 src_kv_shape[0],  # Number of elements (n)
@@ -157,19 +158,19 @@ class WorldModel(nn.Module):
                 len(src_kv),  # Number of layers (num_layers)
                 src_kv._keys_values[0]._k_cache._cache.device,  # Device where the cache is stored
             )
-        
+
         dst_kv = self.shared_pool_init_infer[env_id][self.shared_pool_index_init_envs[env_id]]
-        
+
         for src_layer, dst_layer in zip(src_kv._keys_values, dst_kv._keys_values):
             # Copy the key and value caches using torch.copy_() for efficient data transfer
             dst_layer._k_cache._cache.copy_(src_layer._k_cache._cache)
             dst_layer._v_cache._cache.copy_(src_layer._v_cache._cache)
             dst_layer._k_cache._size = src_layer._k_cache._size
             dst_layer._v_cache._size = src_layer._v_cache._size
-        
+
         index = self.shared_pool_index_init_envs[env_id]
         self.shared_pool_index_init_envs[env_id] = (self.shared_pool_index_init_envs[env_id] + 1) % self.shared_pool_size_init
-        
+
         return index
 
     def custom_copy_kv_cache_to_shared_wm(self, src_kv: KeysValues) -> int:
@@ -182,7 +183,7 @@ class WorldModel(nn.Module):
             - index (:obj:`int`): The index in the shared pool where the KeysValues object is stored.
         """
         src_kv_shape = src_kv._keys_values[0]._k_cache._cache.shape
-        
+
         if self.shared_pool_wm[self.shared_pool_index_wm] is None:
             self.shared_pool_wm[self.shared_pool_index_wm] = KeysValues(
                 src_kv_shape[0],  # Number of elements (n)
@@ -192,18 +193,18 @@ class WorldModel(nn.Module):
                 len(src_kv),  # Number of layers (num_layers)
                 src_kv._keys_values[0]._k_cache._cache.device,  # Device where the cache is stored
             )
-        
+
         dst_kv = self.shared_pool_wm[self.shared_pool_index_wm]
-        
+
         for src_layer, dst_layer in zip(src_kv._keys_values, dst_kv._keys_values):
             # Copy the key and value caches using torch.copy_() for efficient data transfer
             dst_layer._k_cache._cache.copy_(src_layer._k_cache._cache)
             dst_layer._v_cache._cache.copy_(src_layer._v_cache._cache)
             dst_layer._k_cache._size = src_layer._k_cache._size
             dst_layer._v_cache._size = src_layer._v_cache._size
-        
+
         self.shared_pool_index_wm = (self.shared_pool_index_wm + 1) % self.shared_pool_size_wm
-        
+
         return dst_kv
 
     def custom_copy_kv_cache_to_shared_recur(self, src_kv: KeysValues) -> int:
@@ -216,7 +217,7 @@ class WorldModel(nn.Module):
             - index (:obj:`int`): The index in the shared pool where the KeysValues object is stored.
         """
         src_kv_shape = src_kv._keys_values[0]._k_cache._cache.shape
-        
+
         if self.shared_pool_recur_infer[self.shared_pool_index] is None:
             self.shared_pool_recur_infer[self.shared_pool_index] = KeysValues(
                 src_kv_shape[0],  # Number of elements (n)
@@ -226,19 +227,19 @@ class WorldModel(nn.Module):
                 len(src_kv),  # Number of layers (num_layers)
                 src_kv._keys_values[0]._k_cache._cache.device,  # Device where the cache is stored
             )
-        
+
         dst_kv = self.shared_pool_recur_infer[self.shared_pool_index]
-        
+
         for src_layer, dst_layer in zip(src_kv._keys_values, dst_kv._keys_values):
             # Copy the key and value caches using torch.copy_() for efficient data transfer
             dst_layer._k_cache._cache.copy_(src_layer._k_cache._cache)
             dst_layer._v_cache._cache.copy_(src_layer._v_cache._cache)
             dst_layer._k_cache._size = src_layer._k_cache._size
             dst_layer._v_cache._size = src_layer._v_cache._size
-        
+
         index = self.shared_pool_index
         self.shared_pool_index = (self.shared_pool_index + 1) % self.shared_pool_size
-        
+
         return index
 
     def _initialize_config_parameters(self) -> None:
@@ -424,17 +425,14 @@ class WorldModel(nn.Module):
         is_init_infer: bool = True,
         valid_context_lengths: Optional[torch.Tensor] = None,
         start_pos: Union[int, List[int]] = 0,
-        search_depth: Optional[List[int]] = None,
-        original_images : Optional[torch.Tensor] = None,
-        reconstructed_images : Optional[torch.Tensor] = None,
-        plot_attention : Optional[bool] = False
+        search_depth: Optional[List[int]] = None
     ) -> "WorldModelOutput":
         """
         Overview:
             Forward pass for the world model. This method processes observation embeddings and/or action tokens,
             optionally adds position encodings (with or without rotary position embeddings), passes the resulting
             sequences through the transformer, and finally generates logits for observations, rewards, policy, and value.
-        
+
         Arguments:
             - obs_embeddings_or_act_tokens (dict): Dictionary containing one or more of the following keys:
                 - 'obs_embeddings': torch.Tensor representing observation embeddings.
@@ -447,7 +445,7 @@ class WorldModel(nn.Module):
             - start_pos (int or List[int]): Starting positional index for the current sequence (or batch). Defaults to 0.
             - search_depth (Optional[List[int]]): List representing the search depth for each batch element, used for
                 position encoding adjustment. Defaults to None.
-        
+
         Returns:
             WorldModelOutput: An output instance containing:
                 - x: Output features from the transformer.
@@ -487,7 +485,7 @@ class WorldModel(nn.Module):
             if len(obs_embeddings.shape) == 2:
                 obs_embeddings = obs_embeddings.unsqueeze(1)
             num_steps = obs_embeddings.size(1)
-            
+
             if not self.config.rotary_emb:
                 # Add traditional position embeddings if not using rotary embeddings.
                 sequences = self._add_position_embeddings(
@@ -584,37 +582,11 @@ class WorldModel(nn.Module):
         # Process combined observation embeddings and action tokens.
         elif "obs_embeddings_and_act_tokens" in obs_embeddings_or_act_tokens:
             # Process combined inputs to calculate either the target value (for training)
-            obs_embeddings, act_tokens = obs_embeddings_or_act_tokens["obs_embeddings_and_act_tokens"]
-            # now you can decode those embeddings back into pixels:
-            #reconstructed_images = self.tokenizer.decode_to_obs(obs_embeddings)
             # or target policy (for reanalyze phase).
             if self.continuous_action_space:
                 sequences, num_steps = self._process_obs_act_combined_cont(obs_embeddings_or_act_tokens, prev_steps)
             else:
                 sequences, num_steps = self._process_obs_act_combined(obs_embeddings_or_act_tokens, prev_steps)
-                # Plotting attention
-                #if plot_attention:
-                    #obs_embeddings, act_tokens = obs_embeddings_or_act_tokens['obs_embeddings_and_act_tokens']
-                    #visualize_sequence_only(original_images) # Plot original images (frames)
-                    #visualize_attention_maps(self.transformer, sequences, None, valid_context_lengths, suffix=self.config.attention)
-                    # #visualize_attention_map(
-                    #     self.transformer,
-                    #     sequences,
-                    #     kv_cache=None,
-                    #     valid_context_lengths=valid_context_lengths,
-                    #     layer_id=0,
-                    #     head_id=3,
-                    #     suffix=f"{self.config.attention}_layer0_head3"
-                    # )
-                    # visualize_attention_map(
-                    #     self.transformer,
-                    #     sequences,
-                    #     kv_cache=None,
-                    #     valid_context_lengths=valid_context_lengths,
-                    #     layer_id=1,
-                    #     head_id=3,
-                    #     suffix=f"{self.config.attention}_layer1_head3"
-                    # )
             # Adjust start positions: multiply by 2 as the sequence has both obs and act.
             start_pos_adjusted = [pos * 2 for pos in start_pos]
         else:
@@ -727,7 +699,7 @@ class WorldModel(nn.Module):
             act = act_embeddings[:, i, 0, :].unsqueeze(1)
             obs_act = torch.cat([obs, act], dim=1)
             obs_act_embeddings[:, i * (K + 1):(i + 1) * (K + 1), :] = obs_act
-            
+
         return_result = obs_act_embeddings
         if not self.config.rotary_emb:
             return_result += self.pos_emb(prev_steps + torch.arange(num_steps, device=self.device))
@@ -866,7 +838,7 @@ class WorldModel(nn.Module):
                     # TODO: len(last_obs_embeddings) may smaller than len(current_obs_embeddings), because some environments may have done
                     # TODO: the order may be not correct?  len(batch_action) may smaller than len(current_obs_embeddings), because some environments may have done
                     batch_action = batch_action[:ready_env_num]
-                    
+
                     # TODO: only for debug
                     # if ready_env_num < self.env_num:
                     #     print(f'init inference ready_env_num: {ready_env_num} < env_num: {self.env_num}')
@@ -881,7 +853,7 @@ class WorldModel(nn.Module):
                         act_tokens = torch.from_numpy(np.array(batch_action)).to(last_obs_embeddings.device).unsqueeze(1)
                     else:
                         act_tokens = torch.from_numpy(np.array(batch_action)).to(last_obs_embeddings.device).unsqueeze(-1)
-                    
+
                     outputs_wm = self.forward({'act_tokens': act_tokens}, past_keys_values=self.keys_values_wm,
                                               is_init_infer=True, start_pos=start_pos)
                     outputs_wm = self.forward({'obs_embeddings': current_obs_embeddings},
@@ -951,7 +923,7 @@ class WorldModel(nn.Module):
         Arguments:
             - state_action_history (:obj:`list`): List containing tuples of state and action history.
             - simulation_index (:obj:`int`, optional): Index of the current simulation. Defaults to 0.
-            - search_depth (:obj:`list`, optional): List containing depth of latent states in the search tree. 
+            - search_depth (:obj:`list`, optional): List containing depth of latent states in the search tree.
         Returns:
             - tuple: A tuple containing output sequence, updated latent state, reward, logits policy, and logits value.
         """
@@ -1002,7 +974,7 @@ class WorldModel(nn.Module):
                 kvcache_independent=False,
                 is_init_infer=False,
                 start_pos=start_pos,
-                search_depth=search_depth # List containing depth of latent states in the search tree. 
+                search_depth=search_depth # List containing depth of latent states in the search tree.
             )
 
             self.keys_values_wm_size_list_current = [i + 1 for i in self.keys_values_wm_size_list_current]
@@ -1275,7 +1247,7 @@ class WorldModel(nn.Module):
                 self.keys_values_wm_single_env = self.transformer.generate_empty_keys_values(
                     n=1, max_tokens=self.context_length
                 )
-                
+
                 # Determine the absolute start position based on the reanalyze phase flag.
                 if self.reanalyze_phase:
                     num_rows, num_cols = start_pos.shape  # Original start_pos shape is (batch, num_columns)
@@ -1297,21 +1269,18 @@ class WorldModel(nn.Module):
         return self.keys_values_wm_size_list
 
 
-    def compute_loss(self, batch, target_tokenizer: Tokenizer = None, inverse_scalar_transform_handle=None, plot_policy : bool = False,
+    def compute_loss(self, batch, target_tokenizer: Tokenizer = None, inverse_scalar_transform_handle=None,
                      **kwargs: Any) -> LossWithIntermediateLosses:
         start_pos = batch['timestep']
         # Encode observations into latent state representations
         obs_embeddings = self.tokenizer.encode_to_obs_embeddings(batch['observations'])
-        if len(self.last_obs_embeddings) >= 10:
-            self.last_obs_embeddings.append(obs_embeddings)
-
 
         # ========= for visual analysis =========
         # Uncomment the lines below for visual analysis in Pong
-        #self.plot_latent_tsne_each_and_all_for_pong(obs_embeddings, suffix='pong_H10_H4_tsne')
-        #self.save_as_image_with_timestep(batch['observations'], suffix='pong_H10_H4_tsne')
+        # self.plot_latent_tsne_each_and_all_for_pong(obs_embeddings, suffix='pong_H10_H4_tsne')
+        # self.save_as_image_with_timestep(batch['observations'], suffix='pong_H10_H4_tsne')
         # Uncomment the lines below for visual analysis in visual match
-        #self.plot_latent_tsne_each_and_all(obs_embeddings, suffix='visual_match_memlen1-60-15_tsne')
+        # self.plot_latent_tsne_each_and_all(obs_embeddings, suffix='visual_match_memlen1-60-15_tsne')
         # self.save_as_image_with_timestep(batch['observations'], suffix='visual_match_memlen1-60-15_tsne')
 
         # ========= logging for analysis =========
@@ -1332,22 +1301,22 @@ class WorldModel(nn.Module):
 
         if self.obs_type == 'image':
             # Reconstruct observations from latent state representations
-            reconstructed_images = self.tokenizer.decode_to_obs(obs_embeddings)
+            # reconstructed_images = self.tokenizer.decode_to_obs(obs_embeddings)
 
             #  ========== for visualization ==========
             # Uncomment the lines below for visual analysis
-            original_images, reconstructed_images = batch['observations'], reconstructed_images
-            #target_policy = batch['target_policy']
-            #target_predict_value = inverse_scalar_transform_handle(batch['target_value'].reshape(-1, 101)).reshape(
-             #    batch['observations'].shape[0], batch['observations'].shape[1], 1)
-            #true_rewards = inverse_scalar_transform_handle(batch['rewards'].reshape(-1, 101)).reshape(
-             #    batch['observations'].shape[0], batch['observations'].shape[1], 1)
+            # original_images, reconstructed_images = batch['observations'], reconstructed_images
+            # target_policy = batch['target_policy']
+            # target_predict_value = inverse_scalar_transform_handle(batch['target_value'].reshape(-1, 101)).reshape(
+            #     batch['observations'].shape[0], batch['observations'].shape[1], 1)
+            # true_rewards = inverse_scalar_transform_handle(batch['rewards'].reshape(-1, 101)).reshape(
+            #     batch['observations'].shape[0], batch['observations'].shape[1], 1)
             #  ========== for visualization ==========
 
             # ========== Calculate reconstruction loss and perceptual loss ============
-            #latent_recon_loss = self.tokenizer.reconstruction_loss(batch['observations'].reshape(-1, 3, 64, 64), reconstructed_images) # NOTE: for stack=1
-            #perceptual_loss = self.tokenizer.perceptual_loss(batch['observations'].reshape(-1, 3, 64, 64), reconstructed_images) # NOTE: for stack=1
-            
+            # latent_recon_loss = self.tokenizer.reconstruction_loss(batch['observations'].reshape(-1, 3, 64, 64), reconstructed_images) # NOTE: for stack=1
+            # perceptual_loss = self.tokenizer.perceptual_loss(batch['observations'].reshape(-1, 3, 64, 64), reconstructed_images) # NOTE: for stack=1
+
             latent_recon_loss = self.latent_recon_loss
             perceptual_loss = self.perceptual_loss
 
@@ -1382,11 +1351,11 @@ class WorldModel(nn.Module):
 
             #  ========== for visualization ==========
             # Uncomment the lines below for visual analysis
-            #target_policy = batch['target_policy']
-            #target_predict_value = inverse_scalar_transform_handle(batch['target_value'].reshape(-1, 101)).reshape(
-            #   batch['observations'].shape[0], batch['observations'].shape[1], 1)
-            #true_rewards = inverse_scalar_transform_handle(batch['rewards'].reshape(-1, 101)).reshape(
-            #    batch['observations'].shape[0], batch['observations'].shape[1], 1)
+            # target_policy = batch['target_policy']
+            # target_predict_value = inverse_scalar_transform_handle(batch['target_value'].reshape(-1, 101)).reshape(
+            #     batch['observations'].shape[0], batch['observations'].shape[1], 1)
+            # true_rewards = inverse_scalar_transform_handle(batch['rewards'].reshape(-1, 101)).reshape(
+            #     batch['observations'].shape[0], batch['observations'].shape[1], 1)
             #  ========== for visualization ==========
 
             # Calculate reconstruction loss and perceptual loss
@@ -1403,7 +1372,7 @@ class WorldModel(nn.Module):
 
         # Forward pass to obtain predictions for observations, rewards, and policies
         outputs = self.forward({'obs_embeddings_and_act_tokens': (obs_embeddings, act_tokens)},
-                               start_pos=start_pos, original_images = original_images, reconstructed_images = reconstructed_images, plot_attention = plot_policy)
+                               start_pos=start_pos)
 
         # ========= logging for analysis =========
         if self.analysis_dormant_ratio:
@@ -1419,13 +1388,12 @@ class WorldModel(nn.Module):
 
         #  ========== for visualization ==========
         # Uncomment the lines below for visualization
-        #predict_policy = outputs.logits_policy
-        #predict_policy = F.softmax(outputs.logits_policy, dim=-1)
-        #predict_value = inverse_scalar_transform_handle(outputs.logits_value.reshape(-1, 101)).reshape(batch['observations'].shape[0], batch['observations'].shape[1], 1)
-        #predict_rewards = inverse_scalar_transform_handle(outputs.logits_rewards.reshape(-1, 101)).reshape(batch['observations'].shape[0], batch['observations'].shape[1], 1)
+        # predict_policy = outputs.logits_policy
+        # predict_policy = F.softmax(outputs.logits_policy, dim=-1)
+        # predict_value = inverse_scalar_transform_handle(outputs.logits_value.reshape(-1, 101)).reshape(batch['observations'].shape[0], batch['observations'].shape[1], 1)
+        # predict_rewards = inverse_scalar_transform_handle(outputs.logits_rewards.reshape(-1, 101)).reshape(batch['observations'].shape[0], batch['observations'].shape[1], 1)
         # import pdb; pdb.set_trace()
-        #if plot_policy:
-        #    visualize_reward_value_img_policy(original_images, reconstructed_images, target_predict_value, true_rewards, target_policy, predict_value, predict_rewards, predict_policy, not_plot_timesteps=[], suffix='pong_H10_H4_0613')
+        # visualize_reward_value_img_policy(original_images, reconstructed_images, target_predict_value, true_rewards, target_policy, predict_value, predict_rewards, predict_policy, not_plot_timesteps=[], suffix='pong_H10_H4_0613')
 
         # visualize_reward_value_img_policy(original_images, reconstructed_images, target_predict_value, true_rewards, target_policy, predict_value, predict_rewards, predict_policy, not_plot_timesteps=list(np.arange(4,60)), suffix='visual_match_memlen1-60-15/one_success_episode')
         # visualize_reward_value_img_policy(original_images, reconstructed_images, target_predict_value, true_rewards, target_policy, predict_value, predict_rewards, predict_policy, not_plot_timesteps=list(np.arange(4,60)), suffix='visual_match_memlen1-60-15/one_fail_episode')
@@ -1488,7 +1456,7 @@ class WorldModel(nn.Module):
                 orig_policy_loss, policy_entropy_loss, target_policy_entropy, target_sampled_actions, mu, sigma = self._calculate_policy_loss_cont_simple(outputs, batch)
             else:
                 orig_policy_loss, policy_entropy_loss, target_policy_entropy, target_sampled_actions, mu, sigma = self._calculate_policy_loss_cont(outputs, batch)
-            
+
             loss_policy = orig_policy_loss + self.policy_entropy_weight * policy_entropy_loss
             policy_entropy = - policy_entropy_loss
 
@@ -1554,41 +1522,26 @@ class WorldModel(nn.Module):
         discounted_policy_entropy = (policy_entropy.view(-1, batch['actions'].shape[1]) * discounts).sum()/ batch['mask_padding'].sum()
 
         # Adaptive-span regularization
-        span_reg = torch.zeros((), device=discounted_loss_policy.device)
+        R = self.config.adapt_span_ramp
+        if R != 0.0:
+            alpha = min(1.0, float(self._ramp_step) / float(R))
+        else:
+            alpha = 0.0
+
+        span_vals = []
         for block in self.transformer.blocks:
             attn = block.attn
             if isinstance(attn, AdaptiveSpanAttention):
-                # sum over all heads in this block
-                if self.config.adaptive_regularization == "l1":
-                    span_reg = span_reg + F.softplus(attn.span_p).sum()
-                elif self.config.adaptive_regularization == "l2":
-                    span_reg = span_reg + (F.softplus(attn.span_p) ** 2).sum()
+                # F.softplus yields the continuous span per head; .mean() averages across heads
+                span_vals.append(F.softplus(attn.span_p).mean())
 
-        reg_loss = self.config.adaptive_span_regularization * span_reg # O if not used
+        if span_vals:
+            span_reg = torch.stack(span_vals).mean()
+        else:
+            span_reg = torch.tensor(0.0, device=discounted_loss_policy.device)
+
+        reg_loss = self.config.adapt_span_loss * span_reg * alpha
         discounted_loss_policy = discounted_loss_policy + reg_loss
-
-        # GAAM span diversity regularization
-        if self.config.gaam_span_diversity_coeff > 0:
-            div_reg = 0.0
-            for block in self.transformer.blocks:
-                attn = block.attn
-                if isinstance(attn, GAAM):
-                    sigmas = F.softplus(attn.sigma_p)  # (nh,)
-                    mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len)  # (nh,)
-                    H = sigmas.size(0)
-                    for i in range(H):
-                        for j in range(i + 1, H):
-                            s_i, s_j = sigmas[i], sigmas[j]
-                            m_i, m_j = mus[i], mus[j]
-                            # KL[N(m_i,s_i²) || N(m_j,s_j²)]
-                            kl_ij = 0.5 * (
-                                    (s_i ** 2) / (s_j ** 2)
-                                    + ((m_j - m_i) ** 2) / (s_j ** 2)
-                                    - 1
-                                    + 2 * (torch.log(s_j) - torch.log(s_i))
-                            )
-                            div_reg += kl_ij
-            discounted_loss_policy += self.config.gaam_span_diversity_coeff * div_reg
 
         # log span
         span_metrics = {}
@@ -1604,6 +1557,7 @@ class WorldModel(nn.Module):
                 span_metrics[f"gaam_sigma_layer_{ℓ}"] = sigmas
                 span_metrics[f"gaam_mu_layer_{ℓ}"] = mus
 
+        self._ramp_step += 1
         if self.continuous_action_space:
             return LossWithIntermediateLosses(
                 latent_recon_loss_weight=self.latent_recon_loss_weight,
@@ -1673,7 +1627,7 @@ class WorldModel(nn.Module):
 
         # Flatten for vectorized computation
         policy_logits_all = policy_logits_all.view(batch_size * num_unroll_steps, -1)
-        
+
         # Extract mean and standard deviation from logits
         mu, sigma = policy_logits_all[:, :action_space_size], policy_logits_all[:, action_space_size:]
         dist = Independent(Normal(mu, sigma), 1)  # Create the normal distribution
@@ -1793,7 +1747,7 @@ class WorldModel(nn.Module):
 
         if torch.isnan(logits).any():
             raise ValueError(f"NaN detected in outputs for batch {batch} and element '{element}'")
-        
+
         if torch.isnan(labels).any():
             raise ValueError(f"NaN detected in labels_value for batch {batch} and element '{element}'")
 

@@ -41,5 +41,8 @@ def build_attention(config: TransformerConfig) -> Attention:
     elif attention_mode == 'gaam':
         from .gaam import GAAM
         return GAAM(config)
+    elif attention_mode == 'gaussian_adaptive':
+        from .gaussian_adaptive import GaussianAdaptiveSpanAttention
+        return GaussianAdaptiveSpanAttention(config)
     else:
         raise ValueError(f"Unknown attention type: {config.attention}")

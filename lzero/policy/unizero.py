@@ -18,7 +18,6 @@ from lzero.policy import scalar_transform, InverseScalarTransform, phi_transform
     prepare_obs_stack_for_unizero
 from lzero.policy.muzero import MuZeroPolicy
 from .utils import configure_optimizers_nanogpt
-from ..model.unizero_world_models.attention_map import visualize_attention_maps
 from ..model.unizero_world_models.modeling.adaptive_attention import AdaptiveSpanAttention
 from ..model.unizero_world_models.modeling.gaam import GAAM
 
@@ -353,7 +352,7 @@ class UniZeroPolicy(MuZeroPolicy):
         self.l2_norm_after = 0.
         self.grad_norm_before = 0.
         self.grad_norm_after = 0.
-        
+
         if self._cfg.use_wandb:
             # TODO: add the model to wandb
             wandb.watch(self._learn_model.representation_network, log="all")
@@ -443,9 +442,8 @@ class UniZeroPolicy(MuZeroPolicy):
         average_target_policy_entropy = target_policy_entropy.mean()
 
         # Update world model and plots attention map
-        plot_policy = (train_iter >= 20_000)
         losses = self._learn_model.world_model.compute_loss(
-            batch_for_gpt, self._target_model.world_model.tokenizer, self.inverse_scalar_transform_handle, plot_policy
+            batch_for_gpt, self._target_model.world_model.tokenizer, self.inverse_scalar_transform_handle
         )
 
         # Attention is plotted in compute_loss
@@ -496,7 +494,7 @@ class UniZeroPolicy(MuZeroPolicy):
                 del self.l2_norm_before, self.l2_norm_after, self.grad_norm_before, self.grad_norm_after
                 self.l2_norm_before, self.l2_norm_after, self.grad_norm_before, self.grad_norm_after = self._learn_model.encoder_hook.analyze()
                 self._target_model.encoder_hook.clear_data()
-            
+
             # Clip gradients to prevent exploding gradients
             total_grad_norm_before_clip_wm = torch.nn.utils.clip_grad_norm_(
                 self._learn_model.world_model.parameters(), self._cfg.grad_clip_value
@@ -593,9 +591,42 @@ class UniZeroPolicy(MuZeroPolicy):
             if isinstance(attn, GAAM):
                 sigmas = F.softplus(attn.sigma_p).detach().cpu().tolist()
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu().tolist()
-                return_log_dict[f"gaam_sigma/layer_{layer_id}"] = wandb.Histogram(sigmas)
-                return_log_dict[f"gaam_mu/layer_{layer_id}"] = wandb.Histogram(mus)
-        
+                return_log_dict[f"gaam_sigma/layer_{layer_id}"] = sigmas
+                return_log_dict[f"gaam_mu/layer_{layer_id}"] = mus
+
+        # Log attention map to wandb
+        self.attn_logged = True # TODO: Remove eventually
+        if not self.attn_logged and self.attn_plotted:
+            cfg = self._cfg.model.world_model_cfg
+            cfg_id = (
+                f"{cfg.attention}"
+                f"_L{cfg.num_layers}"
+                f"_H{cfg.num_heads}"
+                f"_E{cfg.embed_dim}"
+                f"_{cfg.tokens_per_block}x{cfg.max_blocks}"
+            )
+
+            base_dir = '/home/ddediosallegue/projects/UniZero'
+            suffix = 'compute_loss_initial_attention'
+            nhead_each_row = 4  # keep this in sync with your plotting call
+
+            # now include cfg_id in the filename
+            fn = f'{suffix}/attn_maps_{cfg_id}_{nhead_each_row}-each-row.png'
+            file_path = os.path.join(base_dir, fn)
+
+            # Creates artifact
+            art = wandb.Artifact(
+                name="attn_maps_initial_attention",
+                type="attention-maps",
+                description=(
+                    "Attention maps (all heads & layers) for the initial "
+                    f"compute_loss batch [{cfg_id}]"
+                )
+            )
+
+            art.add_file(file_path)
+            wandb.log_artifact(art)
+
         if self._cfg.use_wandb:
             wandb.log({'learner_step/' + k: v for k, v in return_log_dict.items()}, step=self.env_step)
             wandb.log({"learner_iter_vs_env_step": self.train_iter}, step=self.env_step)
@@ -708,7 +739,7 @@ class UniZeroPolicy(MuZeroPolicy):
             batch_action = []
             for i, env_id in enumerate(ready_env_id):
                 distributions, value = roots_visit_count_distributions[i], roots_values[i]
-                
+
                 if self._cfg.eps.eps_greedy_exploration_in_collect:
                     # eps greedy collect
                     action_index_in_legal_action_set, visit_count_distribution_entropy = select_action(
@@ -1043,61 +1074,3 @@ class UniZeroPolicy(MuZeroPolicy):
                 # If rotary_emb is False, nn.Embedding is used for absolute position encoding.
                 model.world_model.precompute_pos_emb_diff_kv()
             model.world_model.clear_caches()
-        torch.cuda.empty_cache()
-
-    def visualize_attn_map(self):
-        """
-        Visualizes a 20×20 slice of the self‐attention map on CPU to avoid CUDA device‐side asserts.
-        """
-
-        import torch
-
-        wm = self._model.world_model
-        orig_dev = next(wm.parameters()).device
-
-        obs = self.last_batch_obs.to(orig_dev)
-        acts = self.last_batch_action
-
-        B = obs.shape[0]
-        obs_emb = wm.tokenizer.encode_to_obs_embeddings(obs)
-        if wm.continuous_action_space:
-            at = torch.as_tensor(acts, dtype=torch.float32, device=orig_dev)
-            act_tokens = at.unsqueeze(1)
-            combined, _ = wm._process_obs_act_combined_cont(
-                {"obs_embeddings_and_act_tokens": (obs_emb, act_tokens)},
-                prev_steps=torch.zeros((B, 1), dtype=torch.long, device=orig_dev),
-            )
-        else:
-            at = torch.as_tensor(acts, dtype=torch.long, device=orig_dev)
-            max_idx = wm.act_embedding_table.num_embeddings - 1
-            at = at.clamp(0, max_idx)
-            act_tokens = at.unsqueeze(1).unsqueeze(2)
-            combined, _ = wm._process_obs_act_combined(
-                {"obs_embeddings_and_act_tokens": (obs_emb, act_tokens)},
-                prev_steps=torch.zeros((B, 1), dtype=torch.long, device=orig_dev),
-            )
-
-        combined_cpu = combined.cpu()
-        wm.transformer.cpu()
-
-        _, T, C = combined_cpu.shape
-        if T < 20:
-            pad = combined_cpu.new_zeros((B, 20 - T, C))
-            seq20 = torch.cat([combined_cpu, pad], dim=1)
-            valid_len = T
-        else:
-            seq20 = combined_cpu[:, :20, :]
-            valid_len = 20
-
-        valid_lens = torch.full((B,), valid_len, dtype=torch.long, device="cpu")
-
-        # ── 9) Call visualize_attention_maps on CPU ──────────────────────────────────
-        visualize_attention_maps(
-            model=wm.transformer,  # CPU transformer
-            input_embeddings=seq20,  # (B,20,C_emb) on CPU
-            kv_cache=None,
-            valid_context_lengths=valid_lens,  # (B,) on CPU
-            suffix="20x20_end_of_training_attn",
-            nhead_each_row=4,
-        )
-        wm.to(orig_dev)
