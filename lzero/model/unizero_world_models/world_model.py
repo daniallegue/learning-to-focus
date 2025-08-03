@@ -12,6 +12,7 @@ from lzero.model.common import SimNorm
 from lzero.model.utils import cal_dormant_ratio
 from lzero.model.unizero_world_models.modeling.kv_caching import KeysValues
 from .modeling.gaam import GAAM
+from .modeling.gaussian_adaptive import GaussianAdaptiveSpanAttention
 from .slicer import Head, PolicyHeadCont
 from .tokenizer import Tokenizer
 from lzero.model.unizero_world_models.modeling.transformer import Transformer, TransformerConfig
@@ -1531,7 +1532,7 @@ class WorldModel(nn.Module):
         span_vals = []
         for block in self.transformer.blocks:
             attn = block.attn
-            if isinstance(attn, AdaptiveSpanAttention):
+            if isinstance(attn, AdaptiveSpanAttention) or isinstance(attn, GaussianAdaptiveSpanAttention):
                 # F.softplus yields the continuous span per head; .mean() averages across heads
                 span_vals.append(F.softplus(attn.span_p).mean())
 
@@ -1547,10 +1548,10 @@ class WorldModel(nn.Module):
         span_metrics = {}
         for ℓ, block in enumerate(self.transformer.blocks):
             attn = block.attn
-            if isinstance(attn, AdaptiveSpanAttention):
+            if isinstance(attn, AdaptiveSpanAttention) or isinstance(attn, GaussianAdaptiveSpanAttention):
                 spans = F.softplus(attn.span_p).detach()  # tensor (nh,)
                 span_metrics[f"span_layer_{ℓ}"] = spans.cpu()
-            elif isinstance(attn, GAAM):
+            elif isinstance(attn, GAAM) or isinstance(attn, GaussianAdaptiveSpanAttention):
                 # only log them if the layers are GAAM
                 sigmas = F.softplus(attn.sigma_p).detach().cpu()
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu()

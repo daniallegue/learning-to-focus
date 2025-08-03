@@ -115,7 +115,6 @@ class UniZeroModel(nn.Module):
                 self.encoder_hook.setup_hooks(self.representation_network)
             self.tokenizer = Tokenizer(encoder=self.representation_network, decoder_network=None, with_lpips=False,)
             self.world_model = WorldModel(config=world_model_cfg, tokenizer=self.tokenizer)
-            print(f'{sum(p.numel() for p in self.world_model.parameters())} parameters in agent.world_model')
             print('==' * 20)
             print(f'{sum(p.numel() for p in self.world_model.transformer.parameters())} parameters in agent.world_model.transformer')
             print(f'{sum(p.numel() for p in self.tokenizer.encoder.parameters())} parameters in agent.tokenizer.encoder')

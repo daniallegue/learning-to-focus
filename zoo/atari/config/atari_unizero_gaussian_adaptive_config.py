@@ -34,7 +34,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
                 observation_shape=(3, 64, 64),
                 action_space_size=action_space_size,
                 world_model_cfg=dict(
-                    attention='gaam',  # ← Use gaussian attention
+                    attention='gaussian_adaptive',  # ← Use gaussian attention
                     policy_entropy_weight=1e-4,
                     continuous_action_space=False,
                     max_blocks=num_unroll_steps,
@@ -54,7 +54,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
                     max_adaptive_span=20.0,
                     init_adaptive_span=10,  # Initial adaptive span
                     adapt_span_ramp=3.0,
-                    adapt_span_loss=0.0025,
+                    adapt_span_loss=0.025,
 
                     # Gaussian Attention Parameters
                     init_adaptive_mu = 6.0,  # head’s mean offset

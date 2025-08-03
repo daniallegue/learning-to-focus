@@ -588,7 +588,7 @@ class UniZeroPolicy(MuZeroPolicy):
         # Adds learned params for GAAM
         for layer_id, block in enumerate(self._learn_model.world_model.transformer.blocks):
             attn = block.attn
-            if isinstance(attn, GAAM):
+            if isinstance(attn, GAAM) or isinstance(attn, GaussianAdaptiveAttention):
                 sigmas = F.softplus(attn.sigma_p).detach().cpu().tolist()
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu().tolist()
                 return_log_dict[f"gaam_sigma/layer_{layer_id}"] = sigmas

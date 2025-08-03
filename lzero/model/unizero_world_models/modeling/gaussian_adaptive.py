@@ -106,7 +106,7 @@ class GaussianAdaptiveSpanAttention(Attention):
 
         # triangular span gating
         span   = F.softplus(self.span_p).view(1, self.num_heads, 1, 1)
-        tri_w  = (1.0 - dist.unsqueeze(0).unsqueeze(2) / span).clamp(min=0.0)
+        tri_w  = (1.0 - dist.unsqueeze(0).unsqueeze(1) / span).clamp(min=0.0)
         tri_w  = tri_w.masked_fill(~mask, 0.0)
 
         # Gaussian relative-position bias

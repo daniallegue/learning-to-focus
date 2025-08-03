@@ -11,71 +11,21 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')  # or 'Agg', 'Qt5Agg', depending on your system
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 layer0 = [
-    "../results/learning_pong/first_mu_0.csv",
-"../results/learning_pong/second_mu_0.csv",
-"../results/learning_pong/third_mu_0.csv",
-"../results/learning_pong/fourth_mu_0.csv",
-"../results/learning_pong/fifth_mu_0.csv",
+    "../results/pong/mu_1_0.csv",
+    "../results/pong/mu_2_0.csv",
+    "../results/pong/mu_3_0.csv",
+    "../results/pong/mu_4_0.csv",
 ]
 
 layer1 = [
-    "../results/learning_pong/first_mu_1.csv",
-    "../results/learning_pong/second_mu_1.csv",
-    "../results/learning_pong/third_mu_1.csv",
-     "../results/learning_pong/fourth_mu_1.csv",
-    "../results/learning_pong/fifth_mu_1.csv",
-]
-
-layer0_boxing = [
-    "../results/learning_boxing_2/first_mu_0.csv",
-"../results/learning_boxing_2/second_mu_0.csv",
-"../results/learning_boxing_2/third_mu_0.csv",
-"../results/learning_boxing_2/fourth_mu_0.csv",
-"../results/learning_boxing_2/fifth_mu_0.csv",
-]
-
-layer1_boxing = [
-    "../results/learning_boxing_2/first_mu_1.csv",
-    "../results/learning_boxing_2/second_mu_1.csv",
-    "../results/learning_boxing_2/third_mu_1.csv",
-     "../results/learning_boxing_2/fourth_mu_1.csv",
-    "../results/learning_boxing_2/fifth_mu_1.csv",
-]
-
-layer_0_bankheist = [
-    "../results/learning_bankheist/first_mu_0.csv",
-    "../results/learning_bankheist/second_mu_0.csv",
-    "../results/learning_bankheist/third_mu_0.csv",
-     "../results/learning_bankheist/fourth_mu_0.csv",
-    "../results/learning_bankheist/fifth_mu_0.csv",
-]
-
-layer_1_bankheist = [
-    "../results/learning_bankheist/first_mu_1.csv",
-    "../results/learning_bankheist/second_mu_1.csv",
-    "../results/learning_bankheist/third_mu_1.csv",
-     "../results/learning_bankheist/fourth_mu_1.csv",
-    "../results/learning_bankheist/fifth_mu_1.csv",
-]
-
-layer_0_pacman = [
-    "../results/learning_pacman/first_mu_0.csv",
-    "../results/learning_pacman/second_mu_0.csv",
-    "../results/learning_pacman/third_mu_0.csv",
-     "../results/learning_pacman/fourth_mu_0.csv",
-    "../results/learning_pacman/fifth_mu_0.csv",
-]
-
-layer_1_pacman = [
-    "../results/learning_pacman/first_mu_1.csv",
-    "../results/learning_pacman/second_mu_1.csv",
-    "../results/learning_pacman/third_mu_1.csv",
-     "../results/learning_pacman/fourth_mu_1.csv",
-    "../results/learning_pacman/fifth_mu_1.csv",
+    "../results/pong/mu_1_1.csv",
+    "../results/pong/mu_2_1.csv",
+    "../results/pong/mu_3_1.csv",
+    "../results/pong/mu_4_1.csv",
 ]
 
 
@@ -165,7 +115,20 @@ def plot_layer_comparison(layer0_paths, layer1_paths, idx):
     means1 = offs1.mean(axis=0)
     stds1  = offs1.std(axis=0)
 
-    # Bar positions
+    layer0_mean = offs0.mean()
+    layer0_std = offs0.std(ddof=1)
+    layer1_mean = offs1.mean()
+    layer1_std = offs1.std(ddof=1)
+
+    print(f"Layer 0 μ = {layer0_mean:.2f} ± {layer0_std:.2f}")
+    print(f"Layer 1 μ = {layer1_mean:.2f} ± {layer1_std:.2f}")
+
+    # combined across both layers
+    all_vals = np.concatenate([offs0.flatten(), offs1.flatten()])
+    combined_mean = all_vals.mean()
+    combined_std = all_vals.std(ddof=1)
+    print(f"Combined μ (both layers) = {combined_mean:.2f} ± {combined_std:.2f}")
+
     indices = np.arange(8)
     width = 0.35
 
@@ -173,10 +136,6 @@ def plot_layer_comparison(layer0_paths, layer1_paths, idx):
         ax = ax1
     elif idx == 1:
         ax = ax2
-    elif idx == 2:
-        ax = ax3
-    else:
-        ax = ax4
 
     # Draw bars with error bars (whiskers) for std
     bars0 = ax.bar(
@@ -218,7 +177,6 @@ def plot_layer_comparison(layer0_paths, layer1_paths, idx):
     ax.set_xlabel("Head Index")
     if idx == 0:
         ax.set_ylabel("Mean Learned $\mu_h$")
-    # ax.set_ylabel("Mean Learned $\mu_h$", fontsize = 14)
     if idx == 0:
         ax.set_title("Mean Learned $\mu_h$ per Head in Pong")
     elif idx == 1:
@@ -235,9 +193,6 @@ def plot_layer_comparison(layer0_paths, layer1_paths, idx):
 
 if __name__ == "__main__":
     plot_layer_comparison(layer0, layer1, 0)
-    plot_layer_comparison(layer0_boxing, layer1_boxing, 1)
-    # fig.tight_layout()
     fig.subplots_adjust(wspace=0.10)
 
     fig.savefig("learned-mu.pdf", bbox_inches='tight')
-
