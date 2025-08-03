@@ -20,6 +20,7 @@ from lzero.policy.muzero import MuZeroPolicy
 from .utils import configure_optimizers_nanogpt
 from ..model.unizero_world_models.modeling.adaptive_attention import AdaptiveSpanAttention
 from ..model.unizero_world_models.modeling.gaam import GAAM
+from ..model.unizero_world_models.modeling.gaussian_adaptive import GaussianAdaptiveSpanAttention
 
 
 @POLICY_REGISTRY.register('unizero')
@@ -30,6 +31,9 @@ class UniZeroPolicy(MuZeroPolicy):
         with Scalable LatentWorld Models. UniZero aims to enhance the planning capabilities of reinforcement learning agents
         by addressing the limitations found in MuZero-style algorithms, particularly in environments requiring the
         capture of long-term dependencies. More details can be found in https://arxiv.org/abs/2406.10667.
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
 
     # The default_config for UniZero policy.
@@ -588,44 +592,11 @@ class UniZeroPolicy(MuZeroPolicy):
         # Adds learned params for GAAM
         for layer_id, block in enumerate(self._learn_model.world_model.transformer.blocks):
             attn = block.attn
-            if isinstance(attn, GAAM) or isinstance(attn, GaussianAdaptiveAttention):
+            if isinstance(attn, GAAM) or isinstance(attn, GaussianAdaptiveSpanAttention):
                 sigmas = F.softplus(attn.sigma_p).detach().cpu().tolist()
                 mus = F.softplus(attn.mu_p_raw).clamp(max=attn.max_len).detach().cpu().tolist()
                 return_log_dict[f"gaam_sigma/layer_{layer_id}"] = sigmas
                 return_log_dict[f"gaam_mu/layer_{layer_id}"] = mus
-
-        # Log attention map to wandb
-        self.attn_logged = True # TODO: Remove eventually
-        if not self.attn_logged and self.attn_plotted:
-            cfg = self._cfg.model.world_model_cfg
-            cfg_id = (
-                f"{cfg.attention}"
-                f"_L{cfg.num_layers}"
-                f"_H{cfg.num_heads}"
-                f"_E{cfg.embed_dim}"
-                f"_{cfg.tokens_per_block}x{cfg.max_blocks}"
-            )
-
-            base_dir = '/home/ddediosallegue/projects/UniZero'
-            suffix = 'compute_loss_initial_attention'
-            nhead_each_row = 4  # keep this in sync with your plotting call
-
-            # now include cfg_id in the filename
-            fn = f'{suffix}/attn_maps_{cfg_id}_{nhead_each_row}-each-row.png'
-            file_path = os.path.join(base_dir, fn)
-
-            # Creates artifact
-            art = wandb.Artifact(
-                name="attn_maps_initial_attention",
-                type="attention-maps",
-                description=(
-                    "Attention maps (all heads & layers) for the initial "
-                    f"compute_loss batch [{cfg_id}]"
-                )
-            )
-
-            art.add_file(file_path)
-            wandb.log_artifact(art)
 
         if self._cfg.use_wandb:
             wandb.log({'learner_step/' + k: v for k, v in return_log_dict.items()}, step=self.env_step)

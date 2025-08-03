@@ -9,6 +9,9 @@ class Attention(nn.Module):
     """
     Base interface for all attention modules.
     All subclasses must implement forward(x, kv_cache=None, valid_ctx_len=None, freqs_cis=None)
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
 
     def __init__(self, config: TransformerConfig):

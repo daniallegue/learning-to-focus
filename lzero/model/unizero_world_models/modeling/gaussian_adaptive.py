@@ -17,6 +17,9 @@ class GaussianAdaptiveSpanAttention(Attention):
     Combines Adaptive Span (triangular soft mask) with per-head
     Gaussian relative-position bias. Outside the learned span,
     attention weights are zero.
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__(config)

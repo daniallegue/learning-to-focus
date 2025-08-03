@@ -58,7 +58,7 @@ def visualize_attention_map(model, input_embeddings: torch.Tensor, kv_cache: Opt
     plt.title(f'Attention Map of Layer {layer_id} Head {head_id}')
     plt.show()
 
-    directory = f'/home/ddediosallegue/projects/UniZero/{suffix}' # Change the placeholder
+    directory = f'/placeholder/{suffix}' # Change the placeholder
     if not os.path.exists(directory):
         os.makedirs(directory)
     plt.savefig(f'{directory}/attn_map_layer_{layer_id}_head_{head_id}.png')
@@ -122,7 +122,7 @@ def visualize_attention_maps(model, input_embeddings: torch.Tensor, kv_cache: Op
                 head_count += 1
 
     plt.tight_layout()
-    directory = f'/home/ddediosallegue/projects/UniZero/{suffix}' # Change the placeholder
+    directory = f'/placeholder/{suffix}' # Change the placeholder
     plt.savefig(f'attn_maps_{nhead_each_row}-each-row.pdf', dpi=300)
     print(f'Attention maps saved to {directory}/attn_maps_{nhead_each_row}-each-row.pdf')
     plt.close()

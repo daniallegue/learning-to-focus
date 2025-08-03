@@ -32,6 +32,9 @@ class WorldModel(nn.Module):
             - a tokenizer, which encodes observations into embeddings,
             - a transformer, which processes the input sequences,
             - and heads, which generate the logits for observations, rewards, policy, and value.
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
 
     def __init__(self, config: TransformerConfig, tokenizer) -> None:

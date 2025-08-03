@@ -1,5 +1,8 @@
 """
 Standard Autoregressive Self-Attention Module for Transformers (Causal Attention)
+
+Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
 """
 import math
 from typing import Optional

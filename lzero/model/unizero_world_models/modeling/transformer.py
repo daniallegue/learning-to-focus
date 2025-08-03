@@ -83,6 +83,9 @@ class Transformer(nn.Module):
     """
     Transformer model class.
 
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
+
     Arguments:
         - config (:obj:`TransformerConfig`): Configuration for the Transformer model.
 

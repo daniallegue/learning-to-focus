@@ -19,6 +19,9 @@ class LocalAttention(Attention):
     Implements causal self-attention *with* a fixed local window constraint.
     Built on top of Causal Attn to ensure correctness of KV and autoregressive behavior.
 
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
+
     Arguments:
         config (TransformerConfig): Configuration object containing hyperparameters.
 

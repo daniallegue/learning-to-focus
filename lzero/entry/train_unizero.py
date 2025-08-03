@@ -52,6 +52,10 @@ def train_unizero(
     
     Returns:
         - policy (:obj:`Policy`): The converged policy after training.
+
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
 
     cfg, create_cfg = input_cfg

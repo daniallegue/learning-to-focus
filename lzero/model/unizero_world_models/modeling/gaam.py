@@ -19,6 +19,9 @@ class GAAM(Attention):
 
     Each head learns a mean offset (mu_p_raw) and a variance (sigma_p) for a Gaussian
     over relative positions, which modulates the attention scores multiplicatively.
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__(config)

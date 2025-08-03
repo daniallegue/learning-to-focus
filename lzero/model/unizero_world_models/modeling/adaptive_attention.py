@@ -16,6 +16,9 @@ from .transformer_config import TransformerConfig
 class AdaptiveSpanAttention(Attention):
     """
     Implements adaptive span self-attention with a fully-differentiable soft mask.
+
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
     """
 
     def __init__(self, config: TransformerConfig) -> None:

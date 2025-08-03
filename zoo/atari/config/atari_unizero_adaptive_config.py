@@ -2,13 +2,17 @@ from easydict import EasyDict
 from zoo.atari.config.atari_env_action_space_map import atari_env_action_space_map
 
 def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
+    """
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
+    """
     action_space_size = atari_env_action_space_map[env_id]
 
     collector_env_num = 8
     game_segment_length = 400
     evaluator_env_num = 3
     num_simulations = 50
-    max_env_step = 105000
+    max_env_step = 100000
     batch_size = 64
     num_unroll_steps = 10
     infer_context_length = 4
@@ -49,14 +53,14 @@ def main(env_id='PongNoFrameskip-v4', seed=0, init_span = 4):
                     env_num=max(collector_env_num, evaluator_env_num),
                     rotary_emb=False,
 
-                    # Set window size
+                    # Set window size (unused)
                     local_window_size=20,
 
                     # Adaptive span parameters
                     max_adaptive_span= 20.0,
                     init_adaptive_span=float(init_span),  # Initial adaptive span
                     adapt_span_ramp=3.0,
-                    adapt_span_loss=0.0025
+                    adapt_span_loss=0.025
                 ),
             ),
             model_path=None,

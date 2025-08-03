@@ -62,6 +62,10 @@ class UniZeroModel(nn.Module):
                 - num_heads (:obj:`int`): The number of heads in the transformer.
                 - policy_entropy_weight (:obj:`float`): The weight of the policy entropy.
                 - analysis_sim_norm (:obj:`bool`): Whether to analyze the similarity of the norm.
+
+
+        Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
         """
         super(UniZeroModel, self).__init__()
         self.action_space_size = action_space_size

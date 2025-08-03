@@ -1,5 +1,8 @@
 """
 Config Dataclass for the Transformer backbone.
+
+Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
 """
 from typing import Optional
 from dataclasses import dataclass

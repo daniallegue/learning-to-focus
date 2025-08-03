@@ -4,6 +4,10 @@ from zoo.atari.config.atari_env_action_space_map import atari_env_action_space_m
 
 
 def main(env_id='PongNoFrameskip-v4', seed=0):
+    """
+    Part of conference submission: "Learning to Focus: Prioritizing Informative Histories with Structured Attention
+ Mechanisms in Partially Observable Reinforcement Learning"
+    """
     action_space_size = atari_env_action_space_map[env_id]
 
     # ==============================================================
@@ -16,7 +20,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
     max_env_step = 115000
     batch_size = 64
     num_unroll_steps = 10
-    infer_context_length = 4 # H
+    infer_context_length = 4
     num_layers = 2
     replay_ratio = 0.25
 
@@ -87,7 +91,7 @@ def main(env_id='PongNoFrameskip-v4', seed=0):
             # train_start_after_envsteps=0, # TODO: only for debug
             game_segment_length=game_segment_length,
             replay_buffer_size=int(1e6),
-            eval_freq=10000,
+            eval_freq=20000,
             collector_env_num=collector_env_num,
             evaluator_env_num=evaluator_env_num,
             use_wandb=True,
