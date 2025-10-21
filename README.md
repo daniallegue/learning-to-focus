@@ -3,7 +3,7 @@
 # LightZero
 
 > LightZero is a lightweight, efficient, and easy-to-understand open-source toolkit combining Monte Carlo Tree Search (MCTS) and deep Reinforcement Learning (RL).  
-> This repository includes our **UniZero** implementation and the research on local, adaptive, and Gaussian attention mechanisms for model-based RL. This implementation is part of CSE3000 Research Project.
+> This repository includes our **UniZero** implementation and the research on local, adaptive, and Gaussian attention mechanisms for model-based RL in our paper: *Learning to Focus: Prioritizing Informative Histories with Structured Attention Mechanisms in Partially Observable Reinforcement Learning*
 
 ---
 
@@ -12,7 +12,7 @@
 ## ⚙️ Installation
 
 ```bash
-git clone https://github.com/opendilab/LightZero.git
+git clone https://github.com/daniallegue/learning-to-focus.git
 cd LightZero
 pip install -e .
 ````
@@ -91,6 +91,17 @@ We implement and evaluate three attention variants within the UniZero world mode
   (frame-sequence and reward/value/policy visualizers)
 
 ## 📄 Citation
+
+To cite our paper, please use: 
+
+```bibtex
+@inproceedings{allegue2025learning,
+    title={Learning to Focus: Prioritizing Informative Histories with Structured Attention Mechanisms in Partially Observable Reinforcement Learning},
+    author={Daniel De Dios Allegue and Jinke He and Frans A Oliehoek},
+    booktitle={NeurIPS 2025 Workshop on Embodied World Models for Decision Making},
+    year={2025},
+}
+```
 
 If you use UniZero or its attention research, please cite:
 
