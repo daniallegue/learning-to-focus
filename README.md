@@ -1,6 +1,6 @@
 <div id="top"></div>
 
-# LightZero
+# Modifications on UniZero based on the LightZero implementation
 
 > LightZero is a lightweight, efficient, and easy-to-understand open-source toolkit combining Monte Carlo Tree Search (MCTS) and deep Reinforcement Learning (RL).  
 > This repository includes our **UniZero** implementation and the research on local, adaptive, and Gaussian attention mechanisms for model-based RL in our paper: *Learning to Focus: Prioritizing Informative Histories with Structured Attention Mechanisms in Partially Observable Reinforcement Learning*
